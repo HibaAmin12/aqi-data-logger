@@ -1,0 +1,2 @@
+timestamp,temperature,humidity,wind_speed,weather_main,aqi,pm2_5,pm10,co,no2
+2025-06-21 08:16:51,34.99,55,3.6,Smoke,3,35.49,62.6,281.42,1.27
