@@ -36,4 +36,4 @@ with open(file_path, mode='a', newline='') as file:
     writer = csv.DictWriter(file, fieldnames=data.keys())
     if not file_exists:
         writer.writeheader()
-    writer.writerow(data) isko edit kr k do
+    writer.writerow(data) 
