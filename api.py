@@ -68,7 +68,7 @@ final_data = {
 
 # ✅ Save to CSV (Auto Create Folder)
 os.makedirs("data", exist_ok=True)  # Make sure folder exists
-file_path = "data/api.csv"  # Save inside 'data/' folder
+file_path = "api.csv"  
 file_exists = os.path.isfile(file_path)
 
 with open(file_path, mode='a', newline='') as file:
