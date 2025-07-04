@@ -1,0 +1,35 @@
+name: Fetch AQICN AQI Data Every 3 Hours
+
+on:
+  schedule:
+    - cron: '30 */3 * * *'  # Every 3 hours (30 minutes after OWM, for safety)
+  workflow_dispatch:
+
+jobs:
+  fetch_aqicn_data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Dependencies
+        run: pip install requests
+
+      - name: Run AQICN Fetch Script
+        env:
+          WAQI_API_TOKEN: ${{ secrets.WAQI_API_TOKEN }}
+        run: python aqicn_fetch.py
+
+      - name: Commit Data
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api.csv
+          git commit -m "AQICN AQI data update" || echo "No changes to commit"
+          git push
