@@ -41,7 +41,6 @@ aqi_value = calculate_pm25_aqi(pm2_5)
 
 owm_data = {
     "timestamp": now,
-    "source": "OpenWeatherMap",
     "temperature": weather_data["main"]["temp"],
     "humidity": weather_data["main"]["humidity"],
     "wind_speed": weather_data["wind"]["speed"],
