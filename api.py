@@ -68,7 +68,7 @@ final_data = {
 
 # Save to CSV
 os.makedirs("data", exist_ok=True)
-file_path = "data/combined_aqi_data.csv"
+file_path = "api.csv"
 file_exists = os.path.isfile(file_path)
 
 with open(file_path, mode='a', newline='') as file:
