@@ -3,64 +3,78 @@ import requests
 import csv
 import datetime
 
-# Get API Key
-API_KEY = os.getenv("API_KEY")
+# Load API Keys from Environment Variables
+OWM_API_KEY = os.getenv("API_KEY")
+WAQI_API_TOKEN = os.getenv("WAQI_API_TOKEN")
+
 LAT = "31.5497"
 LON = "74.3436"
 
 # API URLs
-weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
-pollution_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={API_KEY}"
+weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}&appid={OWM_API_KEY}&units=metric"
+pollution_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={OWM_API_KEY}"
+aqicn_url = f"https://api.waqi.info/feed/Lahore/?token={WAQI_API_TOKEN}"
 
-# Get current timestamp
+# Current timestamp
 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Fetch data
+# Fetch Weather Data
 weather_data = requests.get(weather_url).json()
+# Fetch OWM Air Pollution Data
 pollution_data = requests.get(pollution_url).json()
+# Fetch AQICN Data
+aqicn_data = requests.get(aqicn_url).json()
 
-# Extract PM2.5
-pm2_5 = pollution_data["list"][0]["components"]["pm2_5"]
-
-# AQI breakpoints for PM2.5
-def calculate_pm25_aqi(pm):
-    breakpoints = [
-        (0.0, 12.0, 0, 50),
-        (12.1, 35.4, 51, 100),
-        (35.5, 55.4, 101, 150),
-        (55.5, 150.4, 151, 200),
-        (150.5, 250.4, 201, 300),
-        (250.5, 350.4, 301, 400),
-        (350.5, 500.4, 401, 500)
-    ]
-    for c_low, c_high, i_low, i_high in breakpoints:
-        if c_low <= pm <= c_high:
-            return round(((i_high - i_low) / (c_high - c_low)) * (pm - c_low) + i_low, 2)
-    return None
-
-# Calculate actual AQI from PM2.5
-aqi_value = calculate_pm25_aqi(pm2_5)
-
-# Final data dictionary
-data = {
-    "timestamp": now,
+# Extract Data from OWM (OpenWeatherMap)
+owm_pm2_5 = pollution_data["list"][0]["components"]["pm2_5"]
+owm_aqi = pollution_data["list"][0]["main"]["aqi"]
+owm_data = {
     "temperature": weather_data["main"]["temp"],
     "humidity": weather_data["main"]["humidity"],
     "wind_speed": weather_data["wind"]["speed"],
     "weather_main": weather_data["weather"][0]["main"],
-    "aqi": aqi_value,  # Replacing the category-based value with actual calculated AQI
-    "pm2_5": pm2_5,
-    "pm10": pollution_data["list"][0]["components"]["pm10"],
-    "co": pollution_data["list"][0]["components"]["co"],
-    "no2": pollution_data["list"][0]["components"]["no2"]
+    "owm_aqi": owm_aqi,
+    "owm_pm2_5": owm_pm2_5,
+    "owm_pm10": pollution_data["list"][0]["components"]["pm10"],
+    "owm_co": pollution_data["list"][0]["components"]["co"],
+    "owm_no2": pollution_data["list"][0]["components"]["no2"]
 }
 
-# Write to CSV
-file_path = "api.csv"
+# Extract Data from AQICN
+if aqicn_data['status'] == 'ok':
+    aqicn_iaqi = aqicn_data['data'].get('iaqi', {})
+    aqicn_data_clean = {
+        "aqicn_aqi": aqicn_data['data']['aqi'],
+        "aqicn_pm2_5": aqicn_iaqi.get('pm25', {}).get('v'),
+        "aqicn_pm10": aqicn_iaqi.get('pm10', {}).get('v'),
+        "aqicn_co": aqicn_iaqi.get('co', {}).get('v'),
+        "aqicn_no2": aqicn_iaqi.get('no2', {}).get('v')
+    }
+else:
+    aqicn_data_clean = {
+        "aqicn_aqi": None,
+        "aqicn_pm2_5": None,
+        "aqicn_pm10": None,
+        "aqicn_co": None,
+        "aqicn_no2": None
+    }
+
+# Combine All Data
+final_data = {
+    "timestamp": now,
+    **owm_data,
+    **aqicn_data_clean
+}
+
+# Save to CSV
+os.makedirs("data", exist_ok=True)
+file_path = "data/combined_aqi_data.csv"
 file_exists = os.path.isfile(file_path)
 
 with open(file_path, mode='a', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=data.keys())
+    writer = csv.DictWriter(file, fieldnames=final_data.keys())
     if not file_exists:
         writer.writeheader()
-    writer.writerow(data)
+    writer.writerow(final_data)
+
+print("Data Saved Successfully!")
