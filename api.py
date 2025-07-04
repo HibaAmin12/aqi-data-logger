@@ -3,7 +3,7 @@ import requests
 import csv
 import datetime
 
-# ✅ Load API Keys from Environment Variables (Same as GitHub Secrets)
+# ✅ Load API Keys from Environment Variables (GitHub Secrets)
 API_KEY = os.getenv("API_KEY")  # OpenWeatherMap API Key
 WAQI_API_TOKEN = os.getenv("WAQI_API_TOKEN")  # AQICN API Token
 
@@ -20,59 +20,57 @@ now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # ✅ Fetch Weather Data
 weather_data = requests.get(weather_url).json()
-# ✅ Fetch OWM Air Pollution Data
+# ✅ Fetch OpenWeatherMap Pollution Data
 pollution_data = requests.get(pollution_url).json()
 # ✅ Fetch AQICN Data
 aqicn_data = requests.get(aqicn_url).json()
 
-# ✅ Extract Data from OpenWeatherMap
-owm_pm2_5 = pollution_data["list"][0]["components"]["pm2_5"]
-owm_aqi = pollution_data["list"][0]["main"]["aqi"]
+# ✅ Function to Calculate Continuous AQI from PM2.5
+def calculate_pm25_aqi(pm):
+    breakpoints = [
+        (0.0, 12.0, 0, 50),
+        (12.1, 35.4, 51, 100),
+        (35.5, 55.4, 101, 150),
+        (55.5, 150.4, 151, 200),
+        (150.5, 250.4, 201, 300),
+        (250.5, 350.4, 301, 400),
+        (350.5, 500.4, 401, 500)
+    ]
+    for c_low, c_high, i_low, i_high in breakpoints:
+        if c_low <= pm <= c_high:
+            return round(((i_high - i_low) / (c_high - c_low)) * (pm - c_low) + i_low, 2)
+    return None
+
+# ✅ Extract OpenWeatherMap Data
+pm2_5 = pollution_data["list"][0]["components"]["pm2_5"]
+aqi_value = calculate_pm25_aqi(pm2_5)  # ✅ Continuous AQI
+
 owm_data = {
     "temperature": weather_data["main"]["temp"],
     "humidity": weather_data["main"]["humidity"],
     "wind_speed": weather_data["wind"]["speed"],
     "weather_main": weather_data["weather"][0]["main"],
-    "owm_aqi": owm_aqi,
-    "owm_pm2_5": owm_pm2_5,
-    "owm_pm10": pollution_data["list"][0]["components"]["pm10"],
-    "owm_co": pollution_data["list"][0]["components"]["co"],
-    "owm_no2": pollution_data["list"][0]["components"]["no2"]
+    "aqi": aqi_value,  # ✅ Continuous AQI here
+    "pm2_5": pm2_5,
+    "pm10": pollution_data["list"][0]["components"]["pm10"],
+    "co": pollution_data["list"][0]["components"]["co"],
+    "no2": pollution_data["list"][0]["components"]["no2"]
 }
-
-# ✅ Extract Data from AQICN
-if aqicn_data['status'] == 'ok':
-    aqicn_iaqi = aqicn_data['data'].get('iaqi', {})
-    aqicn_data_clean = {
-        "aqicn_aqi": aqicn_data['data']['aqi'],
-        "aqicn_pm2_5": aqicn_iaqi.get('pm25', {}).get('v'),
-        "aqicn_pm10": aqicn_iaqi.get('pm10', {}).get('v'),
-        "aqicn_co": aqicn_iaqi.get('co', {}).get('v'),
-        "aqicn_no2": aqicn_iaqi.get('no2', {}).get('v')
-    }
-else:
-    aqicn_data_clean = {
-        "aqicn_aqi": None,
-        "aqicn_pm2_5": None,
-        "aqicn_pm10": None,
-        "aqicn_co": None,
-        "aqicn_no2": None
-    }
 
 # ✅ Combine All Data
 final_data = {
     "timestamp": now,
-    **owm_data,
-    **aqicn_data_clean
+    **owm_data
 }
 
-# ✅ Save to CSV (Auto Create Folder)
-os.makedirs("data", exist_ok=True)  # Make sure folder exists
-file_path = "api.csv"  
+# ✅ Save to CSV (safe)
+file_path = "api.csv"
 file_exists = os.path.isfile(file_path)
 
 with open(file_path, mode='a', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=final_data.keys())
+    fieldnames = ["timestamp", "temperature", "humidity", "wind_speed", "weather_main",
+                  "aqi", "pm2_5", "pm10", "co", "no2"]
+    writer = csv.DictWriter(file, fieldnames=fieldnames)
     if not file_exists:
         writer.writeheader()
     writer.writerow(final_data)
