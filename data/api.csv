@@ -1,2 +1,0 @@
-timestamp,temperature,humidity,wind_speed,weather_main,owm_aqi,owm_pm2_5,owm_pm10,owm_co,owm_no2,aqicn_aqi,aqicn_pm2_5,aqicn_pm10,aqicn_co,aqicn_no2
-2025-07-04 13:30:47,33.99,75,2.06,Smoke,4,51.36,73.83,663.85,18.08,34,34,,,
