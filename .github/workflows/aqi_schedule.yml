@@ -1,35 +1,38 @@
-name: Fetch OpenWeatherMap AQI & Weather Every 3 Hours
+name: AQI Data Pipeline
 
 on:
   schedule:
-    - cron: '0 */3 * * *'  # Every 3 hours (UTC)
-  workflow_dispatch:
+    - cron: '0 */3 * * *'  # Every 3 hours
+  workflow_dispatch:        # Manual run enabled
 
 jobs:
-  fetch_owm_data:
+  fetch-and-feature:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Install Dependencies
-        run: pip install requests
+    - name: Install dependencies
+      run: pip install -r requirements.txt
 
-      - name: Run OpenWeatherMap Fetch Script
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-        run: python api.py
+    - name: Run API script (api.py)
+      env:
+        API_KEY: ${{ secrets.API_KEY }}
+      run: python api.py
 
-      - name: Commit Data
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api.csv
-          git commit -m "OpenWeatherMap AQI & Weather data update" || echo "No changes to commit"
-          git push
+    - name: Run Feature script (feature.py)
+      run: python feature.py
+
+    - name: Commit updated CSVs
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add api.csv feature_store.csv
+        git diff --quiet && git diff --staged --quiet || git commit -m "⬆️ Update data & feature store"
+        git push
