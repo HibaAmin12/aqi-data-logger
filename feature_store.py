@@ -4,12 +4,12 @@ import pandas as pd
 from datetime import datetime
 import requests
 
-# Load credentials from GitHub Secrets
+#  Load credentials from GitHub Secrets
 api_key = os.environ["HOPSWORKS_API_KEY"]
 project = os.environ["HOPSWORKS_PROJECT"]
 host = os.environ["HOPSWORKS_HOST"]
 
-#Login to Hopsworks
+# Login to Hopsworks
 project = hopsworks.login(
     api_key_value=api_key,
     project=project,
@@ -18,8 +18,8 @@ project = hopsworks.login(
 
 fs = project.get_feature_store()
 
-# Replace this part with your real OpenWeather API data
-# Example dummy data:
+
+
 df = pd.DataFrame([{
     "timestamp": datetime.utcnow(),
     "temperature": 32.5,
@@ -33,11 +33,11 @@ df = pd.DataFrame([{
     "no2": 8.9
 }])
 
+# Convert timestamp to proper datetime format
 df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-# Insert into existing feature group
+#  Get existing feature group
 feature_group = fs.get_feature_group(name="aqi_features", version=1)
 
-#
-Insert in batch mode to avoid Kafka issues
+# 🛠 Insert in batch mode to avoid Kafka issues
 feature_group.insert(df, write_options={"wait_for_job": True})
