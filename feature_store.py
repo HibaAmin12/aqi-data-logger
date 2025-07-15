@@ -43,5 +43,5 @@ df["humidity"] = df["humidity"].astype(int)
 #  Get existing feature group
 feature_group = fs.get_feature_group(name="aqi_features", version=1)
 
-# 🛠 Insert in batch mode to avoid Kafka issues
-feature_group.insert(df, write_options={"wait_for_job": True})
+feature_group.insert(df)
+
