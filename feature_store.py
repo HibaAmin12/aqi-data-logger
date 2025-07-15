@@ -33,8 +33,11 @@ df = pd.DataFrame([{
     "no2": 8.9
 }])
 
-# Convert timestamp to proper datetime format
 df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+# ✅ Convert to float where needed
+float_cols = ["aqi", "temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+df[float_cols] = df[float_cols].astype(float)
 
 #  Get existing feature group
 feature_group = fs.get_feature_group(name="aqi_features", version=1)
