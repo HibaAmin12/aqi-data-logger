@@ -2,8 +2,8 @@ name: Insert AQI data to Hopsworks
 
 on:
   schedule:
-    - cron: '0 */3 * * *'  # Every 3 hours
-  workflow_dispatch:
+    - cron: '0 */3 * * *'   # Run every 3 hours
+  workflow_dispatch:         # Manual trigger
 
 jobs:
   ingest:
@@ -15,7 +15,8 @@ jobs:
       HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -24,7 +25,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install hopsworks==4.2.4 pandas requests
+        pip install hopsworks==4.2.4
+        pip install pandas requests pyarrow
 
-    - name: Run ingest script
+    - name: Run ingestion script
       run: python feature_store.py
