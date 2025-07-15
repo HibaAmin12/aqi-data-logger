@@ -5,7 +5,7 @@ from datetime import datetime
 import requests
 
 #  Load credentials from GitHub Secrets
-api_key = os.environ["HOPSWORKS_API"]
+api_key = os.environ["HOPSWORK_API"]
 project = os.environ["HOPSWORKS_PROJECT"]
 host = os.environ["HOPSWORKS_HOST"]
 
