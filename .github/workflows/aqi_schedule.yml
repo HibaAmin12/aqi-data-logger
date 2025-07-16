@@ -21,7 +21,10 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-        pip install hopsworks
+        pip install hopsworks==4.2.4
+        pip install -r requirements.txt
+        pip install confluent-kafka
+        pip install pandas requests pyarrow
 
     - name:  Run API script (api.py)
       env:
