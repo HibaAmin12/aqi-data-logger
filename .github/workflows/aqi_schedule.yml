@@ -10,38 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    - name: 📥 Checkout repo
       uses: actions/checkout@v3
 
-    - name:  Set up Python
+    - name: 🐍 Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: 📦 Install dependencies
       run: |
         pip install -r requirements.txt
-        pip install hopsworks==4.2.4
-        pip install -r requirements.txt
-        pip install confluent-kafka
-        pip install pandas requests pyarrow
+        pip install "hopsworks[python]==4.2.*"
 
-    - name:  Run API script (api.py)
+    - name: 🌐 Run API script (api.py)
       env:
         API_KEY: ${{ secrets.API_KEY }}
       run: python api.py
 
-    - name: Run Feature Store script (feature_store.py)
+    - name: 🧠 Run Feature Store script (feature_store.py)
       env:
         HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
         HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
         HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
       run: python feature_store.py
 
-    - name: 
+    - name: 💾 Commit updated CSVs (only api.csv)
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        git add api.csv feature_store.csv
-        git diff --quiet && git diff --staged --quiet || git commit -m "⬆️ Update data & feature store"
+        git add api.csv
+        git diff --quiet && git diff --staged --quiet || git commit -m "⬆️ Update API data"
         git push
