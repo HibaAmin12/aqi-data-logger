@@ -27,7 +27,7 @@ jobs:
       run: python api.py
 
     - name: Run Feature script (feature_store.py)
-      run: python feature.py
+      run: python feature_store.py  # 
 
     - name: Commit updated CSVs
       run: |
