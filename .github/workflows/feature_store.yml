@@ -2,7 +2,7 @@ name: Insert AQI data to Hopsworks
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # Run every 3 hours
+    - cron: '0 */3 * * *'   # Every 3 hours
   workflow_dispatch:         # Manual trigger
 
 jobs:
@@ -15,30 +15,29 @@ jobs:
       HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
 
     steps:
-    - name: Checkout repository
+    - name: 📂 Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up Python
+    - name: 🐍 Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: 📦 Install dependencies
       run: |
         pip install hopsworks==4.2.4
         pip install -r requirements.txt
         pip install confluent-kafka
-        pip install pandas requests pyarrow
-        pip install ydata-profiling
+        pip install pandas requests pyarrow sweetviz
 
-    - name: Run ingestion script
+    - name: 🧪 Run ingestion script
       run: python feature_store.py
 
-    - name: 📊 Generate EDA report
-      run: python eda_report.py
+    - name: 📊 Run EDA
+      run: python eda.py
 
     - name: 📤 Upload EDA Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: eda-report
         path: eda_report.html
