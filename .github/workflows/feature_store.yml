@@ -29,6 +29,16 @@ jobs:
         pip install -r requirements.txt
         pip install confluent-kafka
         pip install pandas requests pyarrow
+        pip install ydata-profiling
 
     - name: Run ingestion script
       run: python feature_store.py
+
+    - name: 📊 Generate EDA report
+      run: python eda_report.py
+
+    - name: 📤 Upload EDA Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: eda-report
+        path: eda_report.html
