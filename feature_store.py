@@ -20,13 +20,13 @@ df = df.drop_duplicates(subset=["timestamp"])
 # 🧹 Type conversion
 float_cols = ["aqi", "temperature", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 df[float_cols] = df[float_cols].astype(float)
-df["humidity"] = df["humidity"].astype(int)
+df["humidity"] = df["humidity"].astype("int64")  # ✅ bigint (64-bit integer)
 
 # ✅ Define schema
 features = [
     Feature("timestamp", "timestamp"),
     Feature("temperature", "double"),
-    Feature("humidity", "int"),
+    Feature("humidity", "bigint"),  # ✅ Fixed here
     Feature("wind_speed", "double"),
     Feature("weather_main", "string"),
     Feature("aqi", "double"),
