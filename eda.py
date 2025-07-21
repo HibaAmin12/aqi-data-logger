@@ -2,19 +2,25 @@ import os
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import hopsworks
 
-# ✅ Make sure output folder exists
 os.makedirs("eda_outputs", exist_ok=True)
 
-# Load data
-df = pd.read_csv("api.csv")
+# ✅ Connect to Hopsworks
+api_key = os.environ["HOPSWORKS_API_KEY"]
+project = os.environ["HOPSWORKS_PROJECT"]
+host = os.environ["HOPSWORKS_HOST"]
+
+project = hopsworks.login(api_key_value=api_key, project=project, host=host)
+fs = project.get_feature_store()
+
+# ✅ Read from feature store
+feature_group = fs.get_feature_group(name="aqi_features", version=1)
+df = feature_group.read()
+
+# ✅ EDA as before
 df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-# Basic info
-print(df.info())
-print(df.describe())
-
-# ✅ Numeric-only correlation
+df = df.dropna(subset=["aqi"])
 numeric_df = df.select_dtypes(include='number')
 
 # Heatmap
