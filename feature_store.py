@@ -20,13 +20,13 @@ df = df.drop_duplicates(subset=["timestamp"])
 # 🧹 Type conversion
 float_cols = ["aqi", "temperature", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 df[float_cols] = df[float_cols].astype(float)
-df["humidity"] = df["humidity"].astype("int64")  # ✅ bigint (64-bit integer)
+df["humidity"] = df["humidity"].astype("int64")
 
-# ✅ Define schema
+# 🧬 Define schema
 features = [
     Feature("timestamp", "timestamp"),
     Feature("temperature", "double"),
-    Feature("humidity", "bigint"),  # ✅ Fixed here
+    Feature("humidity", "bigint"),
     Feature("wind_speed", "double"),
     Feature("weather_main", "string"),
     Feature("aqi", "double"),
@@ -36,7 +36,7 @@ features = [
     Feature("no2", "double"),
 ]
 
-# ✅ Get or create feature group
+# ✅ Create feature group — online store disabled
 fg = fs.get_or_create_feature_group(
     name="aqi_features",
     version=1,
@@ -44,9 +44,9 @@ fg = fs.get_or_create_feature_group(
     primary_key=["timestamp"],
     event_time="timestamp",
     features=features,
-    online_enabled=True
+    online_enabled=False  # ❗ THIS FIXES THE ERROR
 )
 
 # ✅ Insert data
 fg.insert(df, write_options={"wait_for_job": True})
-print(f"✅ Inserted {len(df)} rows into Feature Store")
+print(f"✅ Successfully inserted {len(df)} rows into Feature Store.")
