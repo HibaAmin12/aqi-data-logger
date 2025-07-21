@@ -1,6 +1,7 @@
 import os
 import hopsworks
 import pandas as pd
+from hsfs.feature_group import FeatureGroup
 
 # Load secrets from environment
 api_key = os.environ["HOPSWORKS_API_KEY"]
@@ -23,7 +24,7 @@ float_cols = ["aqi", "temperature", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 df[float_cols] = df[float_cols].astype(float)
 df["humidity"] = df["humidity"].astype(int)
 
-# ✅ Check if feature group exists, otherwise create it
+# ✅ Get or create feature group
 try:
     feature_group = fs.get_feature_group(name="aqi_features", version=1)
 except:
@@ -31,11 +32,11 @@ except:
         name="aqi_features",
         version=1,
         primary_key=["timestamp"],
-        description="Air Quality features from OpenWeather API",
+        description="AQI weather & pollution features",
         event_time="timestamp"
     )
 
-# ✅ Insert unique data
+# ✅ Insert unique rows
 feature_group.insert(df)
 
 print(f"✅ Successfully inserted {len(df)} rows into Hopsworks Feature Store.")
