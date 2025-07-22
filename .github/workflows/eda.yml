@@ -1,36 +1,43 @@
-name: EDA Every 3 Hours
+name: Generate EDA report
 
 on:
   schedule:
-    - cron: "0 */3 * * *"  # every 3 hours
-  workflow_dispatch:
+    - cron: '0 */3 * * *'  # Every 3 hours
+  workflow_dispatch:       # Manual trigger
 
 jobs:
-  run-eda:
+  eda:
     runs-on: ubuntu-latest
 
+    env:
+      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+      HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
+      HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
+
     steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v3
+      - name: 📂 Checkout repo
+        uses: actions/checkout@v4
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: 📦 Install dependencies
         run: |
-          pip install hopsworks sweetviz pandas
+          pip install hopsworks==4.2.4
+          pip install pandas sweetviz pyarrow matplotlib seaborn
 
-      - name: 🧪 Run EDA Script
-        env:
-          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
-          HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
-        run: python eda.py
+      - name: 📊 Run EDA script
+        run: |
+          mkdir -p eda_outputs
+          python eda.py
 
-      - name: 💾 Upload report artifact
-        uses: actions/upload-artifact@v3
+      - name: ⬆️ Upload EDA report
+        uses: actions/upload-artifact@v4
         with:
           name: eda-report
-          path: eda_report.html
+          path: |
+            eda_report.html
+            eda_outputs/
+
