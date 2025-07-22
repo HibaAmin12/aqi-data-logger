@@ -33,11 +33,4 @@ jobs:
     - name: 🧪 Run ingestion script
       run: python feature_store.py
 
-    - name: 📊 Run EDA
-      run: python eda.py
-
-    - name: ⬆️ Upload EDA reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: eda-report
-        path: eda_outputs/
+  
