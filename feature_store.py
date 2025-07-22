@@ -20,10 +20,11 @@ df["timestamp"] = pd.to_datetime(df["timestamp"])
 df.reset_index(drop=True, inplace=True)
 df["id"] = df.index + 1
 
-# ✅ Type casting
+# ✅ Type casting (🛠 FIXED HERE)
 float_cols = ["aqi", "temperature", "wind_speed", "pm2_5", "pm10", "co", "no2"]
-df[float_cols] = df[float_cols].astype(float)
-df["humidity"] = df["humidity"].astype(int)
+df[float_cols] = df[float_cols].astype("float32")
+df["humidity"] = df["humidity"].astype("int32")
+df["id"] = df["id"].astype("int32")
 df["weather_main"] = df["weather_main"].astype(str)
 
 # ✅ Define schema
