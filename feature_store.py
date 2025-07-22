@@ -1,52 +1,55 @@
 import os
-import hopsworks
 import pandas as pd
-from hsfs.feature import Feature
+import hopsworks
 
-# 🔐 Load secrets
+# ✅ Load API keys from GitHub secrets (set in yml)
 api_key = os.environ["HOPSWORKS_API_KEY"]
-project = os.environ["HOPSWORKS_PROJECT"]
+project_name = os.environ["HOPSWORKS_PROJECT"]
 host = os.environ["HOPSWORKS_HOST"]
 
-# 🔗 Connect to Hopsworks
-project = hopsworks.login(api_key_value=api_key, project=project, host=host)
+# ✅ Connect to Hopsworks
+project = hopsworks.login(api_key_value=api_key, project=project_name, host=host)
 fs = project.get_feature_store()
 
-# 📥 Load data
+# ✅ Load CSV
 df = pd.read_csv("api.csv")
-df["timestamp"] = pd.to_datetime(df["timestamp"])
-df = df.drop_duplicates(subset=["timestamp"])
 
-# 🧹 Type conversion
+# ✅ Convert timestamp
+df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+# ✅ Add unique ID column to make each row unique
+df.reset_index(drop=True, inplace=True)
+df["id"] = df.index
+
+# ✅ Correct data types
 float_cols = ["aqi", "temperature", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 df[float_cols] = df[float_cols].astype(float)
-df["humidity"] = df["humidity"].astype("int64")
+df["humidity"] = df["humidity"].astype(int)
+df["weather_main"] = df["weather_main"].astype(str)
 
-# 🧬 Define schema
-features = [
-    Feature("timestamp", "timestamp"),
-    Feature("temperature", "double"),
-    Feature("humidity", "bigint"),
-    Feature("wind_speed", "double"),
-    Feature("weather_main", "string"),
-    Feature("aqi", "double"),
-    Feature("pm2_5", "double"),
-    Feature("pm10", "double"),
-    Feature("co", "double"),
-    Feature("no2", "double"),
-]
+# ✅ Create feature group if not exists
+from hsfs.feature import Feature
 
-# ✅ Create feature group — online store disabled
-fg = fs.get_or_create_feature_group(
-    name="aqi_features",
-    version=1,
-    description="Air Quality Features from API",
-    primary_key=["timestamp"],
-    event_time="timestamp",
-    features=features,
-    online_enabled=False  # ❗ THIS FIXES THE ERROR
-)
+try:
+    fg = fs.get_feature_group(name="aqi_features", version=1)
+    print("✅ Found existing feature group.")
+except:
+    print("ℹ️ Creating new feature group...")
+    fg = fs.create_feature_group(
+        name="aqi_features",
+        version=1,
+        description="AQI data with unique ID and timestamp",
+        primary_key=["id"],
+        event_time="timestamp",
+        online_enabled=False,
+        offline_enabled=True
+    )
+    fg.save()
 
-# ✅ Insert data
-fg.insert(df, write_options={"wait_for_job": True})
-print(f"✅ Successfully inserted {len(df)} rows into Feature Store.")
+# ✅ Insert full dataset (even with same timestamps)
+try:
+    fg.insert(df, write_options={"wait_for_job": True})
+    print(f"✅ Successfully inserted {len(df)} rows into Hopsworks Feature Store.")
+except Exception as e:
+    print("❌ Failed to insert data.")
+    print(f"👉 Error: {e}")
