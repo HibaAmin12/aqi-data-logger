@@ -16,48 +16,43 @@ fs = project.get_feature_store()
 df = pd.read_csv("api.csv")
 df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-# ✅ Assign a unique ID to each row
+# ✅ Assign unique ID
 df.reset_index(drop=True, inplace=True)
-df["id"] = df.index + 1  # starts from 1
+df["id"] = df.index + 1
 
-# ✅ Type conversions
+# ✅ Type casting
 float_cols = ["aqi", "temperature", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 df[float_cols] = df[float_cols].astype(float)
 df["humidity"] = df["humidity"].astype(int)
 df["weather_main"] = df["weather_main"].astype(str)
 
-# ✅ Try to get existing feature group
-try:
-    fg = fs.get_feature_group("aqi_features", version=1)
-    print("✅ Found existing feature group.")
+# ✅ Define schema
+features = [
+    Feature("id", "int"),
+    Feature("timestamp", "timestamp"),
+    Feature("aqi", "double"),
+    Feature("temperature", "double"),
+    Feature("humidity", "int"),
+    Feature("wind_speed", "double"),
+    Feature("weather_main", "string"),
+    Feature("pm2_5", "double"),
+    Feature("pm10", "double"),
+    Feature("co", "double"),
+    Feature("no2", "double")
+]
 
-except:
-    # ❌ Not found: Create a new one
-    print("❌ Feature group not found. Creating new one.")
-    features = [
-        Feature("id", "int"),
-        Feature("timestamp", "timestamp"),
-        Feature("aqi", "double"),
-        Feature("temperature", "double"),
-        Feature("humidity", "int"),
-        Feature("wind_speed", "double"),
-        Feature("weather_main", "string"),
-        Feature("pm2_5", "double"),
-        Feature("pm10", "double"),
-        Feature("co", "double"),
-        Feature("no2", "double")
-    ]
+# ✅ Recreate feature group
+print("🔁 Creating new feature group 'aqi_features'...")
+fg = fs.create_feature_group(
+    name="aqi_features",
+    version=1,
+    description="Fresh AQI dataset with id as primary key",
+    primary_key=["id"],
+    event_time="timestamp",
+    features=features
+)
+fg.save()
 
-    fg = fs.create_feature_group(
-        name="aqi_features",
-        version=1,
-        description="AQI data collected from OpenWeather API",
-        primary_key=["id"],  # 👈 Primary key changed from timestamp to id
-        event_time="timestamp",
-        features=features
-    )
-    fg.save()
-
-# ✅ Insert ALL data from CSV (no filtering by timestamp now)
+# ✅ Insert all data
 fg.insert(df, write_options={"wait_for_job": True})
-print(f"✅ Inserted {len(df)} rows successfully into Hopsworks.")
+print(f"✅ Successfully inserted {len(df)} rows into Hopsworks.")
