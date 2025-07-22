@@ -1,26 +1,29 @@
+# eda.py
+
 import os
 import hopsworks
 import pandas as pd
-import sweetviz
+import sweetviz as sv
 
-# 🔐 Load secrets
+# 🔐 Load secrets from environment
 api_key = os.environ["HOPSWORKS_API_KEY"]
 project_name = os.environ["HOPSWORKS_PROJECT"]
 host = os.environ["HOPSWORKS_HOST"]
 
-# ✅ Login to Hopsworks
+# ✅ Connect to Hopsworks
 project = hopsworks.login(api_key_value=api_key, project=project_name, host=host)
 fs = project.get_feature_store()
-
-# ✅ Get feature group
 fg = fs.get_feature_group(name="aqi_features", version=1)
 
-# ✅ Read data
+# ✅ Load data from feature store
 df = fg.read()
-df = df.sort_values("timestamp", ascending=False).head(50)  # Just latest 50 rows if needed
 
-# ✅ Generate EDA report
-report = sweetviz.analyze(df)
+# ✅ Save preview CSV for debugging (optional)
+df.to_csv("eda_outputs/aqi_data_latest.csv", index=False)
+
+# ✅ Create Sweetviz EDA report
+report = sv.analyze(df)
 report_path = "eda_report.html"
-report.show_html(filepath=report_path, open_browser=False)
-print(f"✅ EDA report saved to {report_path}")
+report.show_html(report_path)
+
+print("✅ EDA report generated and saved.")
