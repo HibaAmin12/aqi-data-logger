@@ -1,9 +1,9 @@
-name: Train and Save Best Model
+name: Train and Evaluate AQI Model
 
 on:
   schedule:
-    - cron: '0 */3 * * *'  # Run every 3 hours
-  workflow_dispatch:
+    - cron: '0 */3 * * *'   # Every 3 hours
+  workflow_dispatch:         # Manual trigger
 
 jobs:
   train:
@@ -15,7 +15,7 @@ jobs:
       HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
 
     steps:
-    - name: 📂 Checkout code
+    - name: 📂 Checkout repository
       uses: actions/checkout@v3
 
     - name: 🐍 Set up Python
@@ -26,21 +26,20 @@ jobs:
     - name: 📦 Install dependencies
       run: |
         pip install hopsworks==4.2.4
-        pip install pandas scikit-learn joblib scipy
-        pip install hopsworks==4.2.4
-        pip install pyarrow
         pip install -r requirements.txt
+        pip install pyarrow joblib scipy
 
+    - name: 📁 Create model_outputs directory
+      run: mkdir -p model_outputs
 
-    - name: 🧠 Train Model
+    - name: 🤖 Run model training
       run: python model_train.py
 
-    - name: 📤 Upload model artifacts
+    - name: ⬆️ Upload model outputs
       uses: actions/upload-artifact@v4
       with:
-        name: model-artifacts
+        name: trained-model-and-results
         path: |
           model_outputs/best_model.pkl
           model_outputs/model_metrics.json
           model_outputs/predictions.csv
-
