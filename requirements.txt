@@ -1,7 +1,7 @@
+hopsworks==4.2.4
 pandas
-requests
+numpy
 scikit-learn
+scipy
 joblib
-streamlit
-hopsworks
-
+matplotlib
