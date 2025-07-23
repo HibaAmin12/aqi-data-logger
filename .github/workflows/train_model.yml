@@ -1,10 +1,12 @@
-name: Train ML Models from Hopsworks
+name: Train AQI Prediction Model
 
 on:
-  workflow_dispatch:  # 🖐 Manual run allowed
+  schedule:
+    - cron: '15 */3 * * *'  # Every 3 hours, 15 minutes after ingestion
+  workflow_dispatch:        # Allow manual run
 
 jobs:
-  train-models:
+  train_model:
     runs-on: ubuntu-latest
 
     env:
@@ -13,18 +15,28 @@ jobs:
       HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
 
     steps:
-      - name: Checkout code
+      - name: 📂 Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: '3.10'
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: |
           pip install hopsworks==4.2.4
-          pip install pandas scikit-learn numpy pyarrow
+          pip install -r requirements.txt
+          pip install pandas scikit-learn xgboost joblib scipy pyarrow
 
-      - name: Run model training script
+      - name: 🤖 Run model training
         run: python model_train.py
+
+      - name: 📤 Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: |
+            model_outputs/best_model.pkl
+            model_outputs/model_metrics.json
+            model_outputs/predictions.csv
