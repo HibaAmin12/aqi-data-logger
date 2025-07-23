@@ -1,81 +1,76 @@
 import os
 import hopsworks
 import pandas as pd
-import joblib
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from scipy.stats import pearsonr
+import joblib
+import json
 
-# 🔐 Load credentials
-api_key       = os.environ["HOPSWORKS_API_KEY"]
-project_name  = os.environ["HOPSWORKS_PROJECT"]
-host          = os.environ["HOPSWORKS_HOST"]
+# 🔐 Load creds
+project = hopsworks.login(
+    api_key_value=os.environ["HOPSWORKS_API_KEY"],
+    project=os.environ["HOPSWORKS_PROJECT"],
+    host=os.environ["HOPSWORKS_HOST"]
+)
 
-# ✅ Login to Hopsworks
-project = hopsworks.login(api_key_value=api_key, project=project_name, host=host)
 fs = project.get_feature_store()
 fg = fs.get_feature_group("aqi_features", version=1)
-
-# ✅ Load data from feature store
 df = fg.read()
 
-# ✅ Drop unused columns
-df = df.drop(columns=["id", "timestamp"])
-df = df.drop_duplicates()
-
-# ✅ Encode categorical feature
-df = pd.get_dummies(df, columns=["weather_main"], drop_first=True)
-
-# ✅ Drop rows with missing target
-df = df[df["aqi"].notna()]
-
-# ✅ Split into features and target
-X = df.drop("aqi", axis=1)
+# 🎯 Features and target
+df = df.dropna()
+X = df.drop(columns=["id", "timestamp", "aqi"])
 y = df["aqi"]
 
-# ✅ Train/test split
+# 📊 Split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# ✅ Define models
+# 🧠 Models
 models = {
     "LinearRegression": LinearRegression(),
-    "Ridge": Ridge(),
-    "DecisionTree": DecisionTreeRegressor(),
-    "RandomForest": RandomForestRegressor()
+    "RandomForest": RandomForestRegressor(n_estimators=100, random_state=42)
 }
 
-# ✅ Store results
 results = []
 
+# 🧪 Train + Evaluate
 for name, model in models.items():
     model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    corr, _ = pearsonr(y_test, y_pred)
+    preds = model.predict(X_test)
+    mse = mean_squared_error(y_test, preds)
+    r2 = r2_score(y_test, preds)
+    pearson_corr, _ = pearsonr(y_test, preds)
 
     results.append({
         "model": name,
+        "object": model,
         "mse": mse,
         "r2": r2,
-        "pearson_corr": corr,
-        "object": model
+        "pearson_corr": pearson_corr
     })
 
-# ✅ Find best model (lowest MSE)
-best_model = min(results, key=lambda x: x["mse"])
+# ✅ Best model (lowest MSE)
+best_model = sorted(results, key=lambda x: x["mse"])[0]
 
-# ✅ Save model
-os.makedirs("models", exist_ok=True)
-joblib.dump(best_model["object"], "models/best_model.pkl")
+# 📂 Save outputs
+os.makedirs("model_outputs", exist_ok=True)
+joblib.dump(best_model["object"], "model_outputs/best_model.pkl")
 
-# ✅ Save metrics
-pd.DataFrame(results).to_csv("models/metrics.csv", index=False)
+with open("model_outputs/model_metrics.json", "w") as f:
+    json.dump({
+        "model": best_model["model"],
+        "mse": best_model["mse"],
+        "r2": best_model["r2"],
+        "pearson_corr": best_model["pearson_corr"]
+    }, f)
 
-print(f"✅ Best model: {best_model['model']}")
-print(f"📉 MSE: {best_model['mse']:.2f}, R²: {best_model['r2']:.2f}, Pearson Corr: {best_model['pearson_corr']:.2f}")
-print("✅ Model and metrics saved in models/ folder.")
+pd.DataFrame({
+    "Actual": y_test,
+    "Predicted": best_model["object"].predict(X_test)
+}).to_csv("model_outputs/predictions.csv", index=False)
+
+print(f"✅ Best model: {best_model['model']} with MSE: {best_model['mse']:.2f}")
