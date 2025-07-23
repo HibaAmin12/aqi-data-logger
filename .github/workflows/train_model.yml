@@ -1,12 +1,12 @@
-name: Train AQI Prediction Model
+name: Train and Save Best Model
 
 on:
   schedule:
-    - cron: '15 */3 * * *'  # Every 3 hours, 15 minutes after ingestion
-  workflow_dispatch:        # Allow manual run
+    - cron: '0 */3 * * *'  # Run every 3 hours
+  workflow_dispatch:
 
 jobs:
-  train_model:
+  train:
     runs-on: ubuntu-latest
 
     env:
@@ -15,28 +15,28 @@ jobs:
       HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
 
     steps:
-      - name: 📂 Checkout repository
-        uses: actions/checkout@v3
+    - name: 📂 Checkout code
+      uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: 📦 Install dependencies
-        run: |
-          pip install hopsworks==4.2.4
-          pip install -r requirements.txt
-          pip install pandas scikit-learn xgboost joblib scipy pyarrow
+    - name: 📦 Install dependencies
+      run: |
+        pip install hopsworks==4.2.4
+        pip install pandas scikit-learn joblib scipy
 
-      - name: 🤖 Run model training
-        run: python model_train.py
+    - name: 🧠 Train Model
+      run: python model_train.py
 
-      - name: 📤 Upload model artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: trained-model
-          path: |
-            model_outputs/best_model.pkl
-            model_outputs/model_metrics.json
-            model_outputs/predictions.csv
+    - name: 📤 Upload model artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: model-artifacts
+        path: |
+          model_outputs/best_model.pkl
+          model_outputs/model_metrics.json
+          model_outputs/predictions.csv
+
