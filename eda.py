@@ -1,50 +1,68 @@
 import os
 import hopsworks
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
 import sweetviz as sv
 
-# 🔐 Credentials from GitHub Secrets
+# Create output directory
+os.makedirs("eda_outputs", exist_ok=True)
+
+# 🔐 Load secrets
 api_key = os.environ["HOPSWORKS_API_KEY"]
 project = os.environ["HOPSWORKS_PROJECT"]
 host = os.environ["HOPSWORKS_HOST"]
 
-# 🔁 Login and get feature group
+# ✅ Connect to Hopsworks
 project = hopsworks.login(api_key_value=api_key, project=project, host=host)
 fs = project.get_feature_store()
-fg = fs.get_feature_group("aqi_features", version=1)
 
-# 📥 Read full data
+# ✅ Load full feature group
+fg = fs.get_feature_group("aqi_features", version=1)
 df = fg.read()
+
+# ✅ Convert timestamp if needed
 df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-# 📁 Save plots
-os.makedirs("eda_outputs", exist_ok=True)
+# ✅ Save CSV snapshot (optional)
+df.to_csv("eda_outputs/aqi_snapshot.csv", index=False)
 
-# 📊 Scatter Plot: AQI vs Temperature
-plt.figure(figsize=(8, 6))
-sns.scatterplot(x="temperature", y="aqi", data=df)
-plt.title("AQI vs Temperature")
-plt.savefig("eda_outputs/aqi_vs_temp.png")
-plt.close()
+# ✅ Sweetviz Report
+print("📊 Generating Sweetviz report...")
+report = sv.analyze(df)
+report_path = "eda_outputs/eda_report.html"
+report.show_html(filepath=report_path)
+print("✅ Sweetviz report saved to", report_path)
 
-# 📊 Heatmap: Correlation
+# ✅ Heatmap
+print("📌 Creating heatmap...")
 plt.figure(figsize=(10, 8))
 sns.heatmap(df.corr(numeric_only=True), annot=True, cmap="coolwarm", fmt=".2f")
-plt.title("Correlation Heatmap")
+plt.title("Feature Correlation Heatmap")
+plt.tight_layout()
 plt.savefig("eda_outputs/heatmap.png")
 plt.close()
 
-# 📊 Boxplot: AQI
-plt.figure(figsize=(8, 6))
-sns.boxplot(y="aqi", data=df)
-plt.title("Box Plot - AQI")
-plt.savefig("eda_outputs/boxplot_aqi.png")
-plt.close()
+# ✅ Box plots (AQI vs all numeric features except AQI & ID)
+numeric_cols = ['temperature', 'humidity', 'wind_speed', 'pm2_5', 'pm10', 'co', 'no2']
 
-# 📋 Sweetviz EDA
-report = sv.analyze(df)
-report.show_html("eda_report.html")
+for col in numeric_cols:
+    plt.figure(figsize=(6, 4))
+    sns.boxplot(x=df[col])
+    plt.title(f"Boxplot of {col}")
+    plt.tight_layout()
+    plt.savefig(f"eda_outputs/boxplot_{col}.png")
+    plt.close()
 
-print("✅ EDA report generated and saved.")
+# ✅ Scatter plots (AQI vs features)
+for col in numeric_cols:
+    plt.figure(figsize=(6, 4))
+    sns.scatterplot(x=df[col], y=df["aqi"])
+    plt.title(f"AQI vs {col}")
+    plt.xlabel(col)
+    plt.ylabel("AQI")
+    plt.tight_layout()
+    plt.savefig(f"eda_outputs/scatter_aqi_vs_{col}.png")
+    plt.close()
+
+print("✅ All EDA plots saved in eda_outputs/")
