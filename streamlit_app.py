@@ -3,7 +3,8 @@ import pandas as pd
 import joblib
 
 # Load model and data
-model = joblib.load("best_model.pkl")
+model = joblib.load("model_outputs/best_model.pkl")
+
 data = pd.read_csv("api.csv")
 
 # Preprocess features (drop target + timestamp + id)
