@@ -1,24 +1,19 @@
 name: Train and Evaluate AQI Model
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 */3 * * *'   # Every 3 hours
-  workflow_dispatch:         # Manual trigger
+    - cron: '0 */3 * * *'  # Every 3 hours
 
 jobs:
   train:
     runs-on: ubuntu-latest
 
-    env:
-      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-      HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
-      HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
-
     steps:
     - name: 📂 Checkout repository
       uses: actions/checkout@v3
       with:
-        token: ${{ secrets.GH_PAT }}   # 🔐 Use Personal Access Token for push access
+        token: ${{ secrets.GH_PAT }}
 
     - name: 🐍 Set up Python
       uses: actions/setup-python@v4
@@ -31,28 +26,24 @@ jobs:
         pip install -r requirements.txt
         pip install pyarrow joblib scipy
 
-    - name: 📁 Create model_outputs directory
+    - name: 📁 Create output folder
       run: mkdir -p model_outputs
 
-    - name: 🤖 Run model training
+    - name: 🤖 Train model
       run: python model_train.py
 
-    - name: ⬆️ Upload model outputs as artifact
+    - name: ⬆️ Upload model as artifact
       uses: actions/upload-artifact@v4
       with:
         name: trained-model-and-results
-        path: |
-          model_outputs/best_model.pkl
-          model_outputs/model_metrics.json
-          model_outputs/predictions.csv
+        path: model_outputs/
 
-    - name: 🚀 Commit model_outputs to GitHub
+    - name: 🚀 Commit & Push model_outputs to repo
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git add model_outputs/
-        git diff --quiet || git commit -m "🔁 Auto-update model outputs"
-        git push
+        git diff --cached --quiet || git commit -m "🤖 Auto-commit model_outputs every 3 hours"
+        git push origin HEAD:main
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
-      continue-on-error: true
