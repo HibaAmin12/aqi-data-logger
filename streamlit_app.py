@@ -1,31 +1,37 @@
 import streamlit as st
-import pandas as pd
+import numpy as np
 import joblib
+import os
 
-# Load model and data
-model = joblib.load("model_outputs/best_model.pkl")
+# 🎯 Load trained model from file
+@st.cache_resource
+def load_model():
+    model_path = "model_outputs/best_model.pkl"
+    if not os.path.exists(model_path):
+        st.error("❌ Trained model not found in 'model_outputs/'. Please upload 'best_model.pkl'.")
+        return None
+    return joblib.load(model_path)
 
-data = pd.read_csv("api.csv")
+model = load_model()
 
-# Preprocess features (drop target + timestamp + id)
-X = data.drop(columns=["aqi", "timestamp", "id"], errors="ignore")
+# 🖥️ Streamlit UI
+st.title("🌫️ AQI Predictor")
 
-# UI
-st.title("🌫️ AQI Prediction App")
-st.write("This app uses a machine learning model to predict the Air Quality Index (AQI) based on weather and pollution data.")
+st.write("Enter environmental parameters to predict Air Quality Index (AQI):")
 
-# Show input data
-with st.expander("📊 Show Input Data"):
-    st.dataframe(X)
+temperature = st.slider("🌡️ Temperature (°C)", 15.0, 45.0, 30.0)
+humidity = st.slider("💧 Humidity (%)", 10, 100, 60)
+wind_speed = st.slider("🌬️ Wind Speed (m/s)", 0.0, 10.0, 2.0)
+pm2_5 = st.number_input("PM2.5 (µg/m³)", 0.0, 300.0, 35.0)
+pm10 = st.number_input("PM10 (µg/m³)", 0.0, 500.0, 50.0)
+co = st.number_input("CO (µg/m³)", 0.0, 1000.0, 400.0)
+no2 = st.number_input("NO₂ (µg/m³)", 0.0, 100.0, 10.0)
 
-# Predict
-if st.button("🔮 Predict AQI"):
-    predictions = model.predict(X)
-    data["Predicted AQI"] = predictions
-    st.success("AQI prediction completed!")
-    st.dataframe(data[["timestamp", "aqi", "Predicted AQI"]])
+input_data = np.array([[temperature, humidity, wind_speed, pm2_5, pm10, co, no2]])
 
-    # Save predictions
-    data.to_csv("model_outputs/predictions.csv", index=False)
-    st.download_button("📥 Download Predictions", data.to_csv(index=False), file_name="predictions.csv")
-
+if st.button("Predict AQI"):
+    if model:
+        aqi = model.predict(input_data)[0]
+        st.success(f"✅ Predicted AQI: **{aqi:.2f}**")
+    else:
+        st.warning("⚠️ Model could not be loaded. Please check 'model_outputs/best_model.pkl'.")
