@@ -3,7 +3,7 @@ name: Train and Evaluate AQI Model
 on:
   schedule:
     - cron: '0 */3 * * *'   # Every 3 hours
-  workflow_dispatch:         # Manual trigger
+  workflow_dispatch:
 
 jobs:
   train:
@@ -15,12 +15,10 @@ jobs:
       HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
 
     steps:
-    - name: 📂 Checkout repository
-      uses: actions/checkout@v3
-      with:
-        token: ${{ secrets.GH_PAT }}   # 🔐 Use Personal Access Token for push access
+    - name: 📂 Checkout repo
+      uses: actions/checkout@v4
 
-    - name: 🐍 Set up Python
+    - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
@@ -28,31 +26,15 @@ jobs:
     - name: 📦 Install dependencies
       run: |
         pip install hopsworks==4.2.4
-        pip install -r requirements.txt
-        pip install pyarrow joblib scipy
+        pip install pyarrow joblib scipy scikit-learn pandas numpy
 
-    - name: 📁 Create model_outputs directory
-      run: mkdir -p model_outputs
-
-    - name: 🤖 Run model training
+    - name: 🏋️ Train Model
       run: python model_train.py
 
-    - name: ⬆️ Upload model outputs as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: trained-model-and-results
-        path: |
-          model_outputs/best_model.pkl
-          model_outputs/model_metrics.json
-          model_outputs/predictions.csv
-
-    - name: 🚀 Commit model_outputs to GitHub
+    - name: 💾 Commit model_outputs to repo
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
         git add model_outputs/
-        git diff --quiet || git commit -m "🔁 Auto-update model outputs"
+        git commit -m "🔄 Update model outputs (automated)" || echo "No changes to commit"
         git push
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      continue-on-error: true
