@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 import os
 
-# 🎯 Load trained model from file
+# 🎯 Load trained model
 @st.cache_resource
 def load_model():
     model_path = "model_outputs/best_model.pkl"
@@ -15,9 +15,8 @@ def load_model():
 model = load_model()
 
 # 🖥️ Streamlit UI
-st.title("🌫️ AQI Predictor")
-
-st.write("Enter environmental parameters to predict Air Quality Index (AQI):")
+st.title("🌫️ AQI Predictor (Next 3 Days)")
+st.write("Enter today's environmental parameters to predict AQI for the next 3 days.")
 
 temperature = st.slider("🌡️ Temperature (°C)", 15.0, 45.0, 30.0)
 humidity = st.slider("💧 Humidity (%)", 10, 100, 60)
@@ -27,11 +26,15 @@ pm10 = st.number_input("PM10 (µg/m³)", 0.0, 500.0, 50.0)
 co = st.number_input("CO (µg/m³)", 0.0, 1000.0, 400.0)
 no2 = st.number_input("NO₂ (µg/m³)", 0.0, 100.0, 10.0)
 
+# Prepare input
 input_data = np.array([[temperature, humidity, wind_speed, pm2_5, pm10, co, no2]])
 
-if st.button("Predict AQI"):
+if st.button("Predict AQI for Next 3 Days"):
     if model:
-        aqi = model.predict(input_data)[0]
-        st.success(f"✅ Predicted AQI: **{aqi:.2f}**")
+        preds = model.predict(input_data)[0]
+        st.subheader("📈 Predicted AQI Levels")
+        st.write(f"📅 **Day 1:** {preds[0]:.2f}")
+        st.write(f"📅 **Day 2:** {preds[1]:.2f}")
+        st.write(f"📅 **Day 3:** {preds[2]:.2f}")
     else:
         st.warning("⚠️ Model could not be loaded. Please check 'model_outputs/best_model.pkl'.")
