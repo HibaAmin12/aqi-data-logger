@@ -1,69 +1,55 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
 import joblib
 import os
 
-# 🎯 Load model
+# 🎯 Load trained multi-output model
 @st.cache_resource
 def load_model():
     model_path = "model_outputs/best_model.pkl"
     if not os.path.exists(model_path):
-        st.error("❌ Trained model not found in 'model_outputs/'.")
+        st.error("❌ Trained model not found in 'model_outputs/'. Please ensure best_model.pkl is present.")
         return None
     return joblib.load(model_path)
 
 model = load_model()
 
-# Load training feature columns
-feature_cols_path = "model_outputs/feature_columns.json"
-if os.path.exists(feature_cols_path):
-    import json
-    with open(feature_cols_path, "r") as f:
-        feature_columns = json.load(f)
-else:
-    feature_columns = None
-
+# 🖥️ UI
 st.title("🌫️ AQI Predictor (Next 3 Days)")
-st.write("Enter today's environmental parameters to predict AQI for the next 3 days.")
+st.write("Enter today's environmental conditions to forecast AQI for the next 3 days.")
 
-# Inputs
-temperature = st.slider("🌡️ Temperature (°C)", 15.0, 45.0, 30.0)
-humidity = st.slider("💧 Humidity (%)", 10, 100, 60)
-wind_speed = st.slider("🌬️ Wind Speed (m/s)", 0.0, 10.0, 2.0)
-pm2_5 = st.number_input("PM2.5 (µg/m³)", 0.0, 300.0, 35.0)
-pm10 = st.number_input("PM10 (µg/m³)", 0.0, 500.0, 50.0)
-co = st.number_input("CO (µg/m³)", 0.0, 1000.0, 400.0)
-no2 = st.number_input("NO₂ (µg/m³)", 0.0, 100.0, 10.0)
-weather_main = st.selectbox("🌦️ Weather", ["Clear", "Clouds", "Smoke", "Mist", "Rain", "Thunderstorm"])
+temperature = st.slider("🌡️ Temperature (°C)", 0.0, 50.0, 25.0)
+humidity    = st.slider("💧 Humidity (%)",       0,   100,  60)
+wind_speed  = st.slider("🌬️ Wind Speed (m/s)",   0.0, 20.0, 2.0)
+pm2_5       = st.number_input("PM2.5 (µg/m³)",    0.0, 300.0, 35.0)
+pm10        = st.number_input("PM10 (µg/m³)",     0.0, 500.0, 50.0)
+co          = st.number_input("CO (µg/m³)",       0.0, 1000.0,400.0)
+no2         = st.number_input("NO₂ (µg/m³)",      0.0, 200.0, 10.0)
 
-# Convert to DataFrame (match training format)
-input_df = pd.DataFrame([{
-    "temperature": temperature,
-    "humidity": humidity,
-    "wind_speed": wind_speed,
-    "pm2_5": pm2_5,
-    "pm10": pm10,
-    "co": co,
-    "no2": no2,
-    "weather_main": weather_main
-}])
+# Prepare input vector
+input_vec = np.array([[temperature, humidity, wind_speed, pm2_5, pm10, co, no2]])
 
-# One-hot encode weather_main
-input_encoded = pd.get_dummies(input_df, columns=["weather_main"], drop_first=True)
-
-# Align with training columns
-if feature_columns:
-    for col in feature_columns:
-        if col not in input_encoded:
-            input_encoded[col] = 0
-    input_encoded = input_encoded[feature_columns]
-
-if st.button("Predict AQI for Next 3 Days"):
-    if model is not None:
-        preds = model.predict(input_encoded)
-        st.success(f"🌟 Day 1 AQI: {preds[0]:.2f}")
-        st.info(f"📆 Day 2 AQI: {preds[0] * 1.02:.2f}")
-        st.warning(f"📆 Day 3 AQI: {preds[0] * 1.04:.2f}")
+# Predict
+if st.button("🔮 Predict AQI for Next 3 Days"):
+    if model is None:
+        st.warning("Model could not be loaded.")
     else:
-        st.error("⚠️ Model not loaded. Please retrain and upload model.")
+        preds = model.predict(input_vec)[0]
+        st.subheader("📈 Forecasted AQI Values")
+        st.write(f"• **Day 1:** {preds[0]:.2f}")
+        st.write(f"• **Day 2:** {preds[1]:.2f}")
+        st.write(f"• **Day 3:** {preds[2]:.2f}")
+
+        # Optional: category labels
+        def aqi_category(aqi):
+            if aqi <= 50:   return "Good 😊"
+            if aqi <= 100:  return "Moderate 😐"
+            if aqi <= 150:  return "Unhealthy for Sensitive Groups 😷"
+            if aqi <= 200:  return "Unhealthy 😷"
+            if aqi <= 300:  return "Very Unhealthy 😫"
+            return "Hazardous ☠️"
+
+        st.subheader("🏷️ AQI Categories")
+        st.write(f"Day 1: {aqi_category(preds[0])}")
+        st.write(f"Day 2: {aqi_category(preds[1])}")
+        st.write(f"Day 3: {aqi_category(preds[2])}")
