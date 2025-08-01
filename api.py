@@ -65,4 +65,4 @@ with open(file_path, mode='a', newline='') as file:
         writer.writeheader()
     writer.writerow(data)
 
-print("✅ OpenWeatherMap AQI & Weather data saved successfully!")
+print("OpenWeatherMap AQI & Weather data saved successfully!")
