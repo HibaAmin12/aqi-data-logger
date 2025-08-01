@@ -1,40 +1,40 @@
-name: Train and Evaluate AQI Model
+name: Model Training
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # Every 3 hours
-  workflow_dispatch:
+    - cron: "0 */3 * * *"  # Runs every 3 hours
+  workflow_dispatch:       # Manual trigger option
 
 jobs:
-  train:
+  train-model:
     runs-on: ubuntu-latest
 
-    env:
-      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-      HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
-      HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
-
     steps:
-    - name: 📂 Checkout repo
-      uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-    - name: 🐍 Setup Python
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: "3.10"
 
-    - name: 📦 Install dependencies
+    - name: Install dependencies
       run: |
-        pip install hopsworks==4.2.4
-        pip install pyarrow joblib scipy scikit-learn pandas numpy
+        pip install "hopsworks[python]==4.2.*" pyarrow scikit-learn xgboost joblib matplotlib pandas numpy seaborn
 
-    - name: 🏋️ Train Model
-      run: python model_train.py
-
-    - name: 💾 Commit model_outputs to repo
+    - name: Train and Evaluate Models
+      env:
+        HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+        HOPSWORKS_PROJECT: Api_feature_store
+        HOPSWORKS_HOST: c.app.hopsworks.ai
       run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "github-actions@github.com"
-        git add model_outputs/
-        git commit -m "🔄 Update model outputs (automated)" || echo "No changes to commit"
+        python model_train.py
+
+    - name: Commit Trained Model and Results
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add models/aqi_best_model.pkl
+        git add *.png || true
+        git commit -m "Automated model training update (Random Forest saved)"
         git push
