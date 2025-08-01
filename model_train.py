@@ -28,8 +28,8 @@ df.dropna(inplace=True)
 df["timestamp"] = pd.to_datetime(df["timestamp"])
 df = df.sort_values("timestamp").reset_index(drop=True)
 
-# ✅ Features (without weather_main) & Targets
-features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+# ✅ Features (removed pm2_5 & pm10) & Targets
+features = ["temperature", "humidity", "wind_speed", "co", "no2"]
 df["aqi_day1"] = df["aqi"].shift(-1)
 df["aqi_day2"] = df["aqi"].shift(-2)
 df["aqi_day3"] = df["aqi"].shift(-3)
@@ -52,6 +52,7 @@ results = {}
 best_model = None
 best_score = -float("inf")
 
+# ✅ Train & Evaluate
 for name, model in models.items():
     model.fit(X_train, y_train)
     preds = model.predict(X_test)
@@ -69,7 +70,7 @@ for name, model in models.items():
         best_name = name
         best_preds = preds
 
-# ✅ Create & save outputs
+# ✅ Save outputs
 os.makedirs("model_outputs", exist_ok=True)
 joblib.dump(best_model, "model_outputs/best_model.pkl")
 
