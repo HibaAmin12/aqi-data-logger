@@ -1,40 +1,39 @@
-name: Generate EDA Report
+name: EDA Automation
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # Every 3 hours
-  workflow_dispatch:
+    - cron: "0 */3 * * *"  # Runs every 3 hours
+  workflow_dispatch:       # Allow manual trigger
 
 jobs:
-  eda:
+  run-eda:
     runs-on: ubuntu-latest
 
-    env:
-      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-      HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT }}
-      HOPSWORKS_HOST: ${{ secrets.HOPSWORKS_HOST }}
-
     steps:
-    - name: 📂 Checkout repository
+    - name: Checkout repo
       uses: actions/checkout@v3
 
-    - name: 🐍 Set up Python
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: "3.10"
 
-    - name: 📦 Install dependencies
+    - name: Install dependencies
       run: |
-        pip install hopsworks==4.2.4
-        pip install sweetviz seaborn matplotlib pandas pyarrow
+        pip install hopsworks sweetviz seaborn scikit-learn matplotlib pandas
 
-    - name: 🧪 Run EDA script
-      run: python eda.py
+    - name: Run EDA
+      env:
+        HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+        HOPSWORKS_PROJECT: Api_feature_store
+        HOPSWORKS_HOST: c.app.hopsworks.ai
+      run: |
+        python eda.py
 
-    - name: ⬆️ Upload EDA Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: eda-report
-        path: |
-          eda_report.html
-          eda_outputs/
+    - name: Commit EDA outputs
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add eda_outputs/*
+        git commit -m "Automated EDA update"
+        git push
