@@ -20,7 +20,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install hopsworks sweetviz seaborn scikit-learn matplotlib pandas
+        pip install "hopsworks[python]==4.2.*" pyarrow sweetviz seaborn scikit-learn matplotlib pandas
 
     - name: Run EDA
       env:
