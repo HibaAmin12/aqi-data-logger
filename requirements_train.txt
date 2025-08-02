@@ -1,0 +1,9 @@
+hopsworks==4.2.*
+pyarrow
+scikit-learn
+xgboost
+joblib
+matplotlib
+pandas
+numpy
+seaborn
