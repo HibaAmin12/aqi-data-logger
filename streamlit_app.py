@@ -7,16 +7,16 @@ from datetime import datetime, timedelta
 model = joblib.load("models/aqi_best_model.pkl")
 
 # Title
-st.title("🌍 3-Day AQI Prediction App")
+st.title(" 3-Day AQI Prediction App")
 st.markdown("Enter today's weather and pollutant data to predict AQI for the next 3 days.")
 
 # Date Selection
-start_date = st.date_input("📅 Select Base Date:", datetime.today())
+start_date = st.date_input("Select Base Date:", datetime.today())
 
 # Input fields
-temperature = st.number_input("🌡 Temperature (°C)", min_value=-10.0, max_value=50.0, value=25.0)
-humidity = st.number_input("💧 Humidity (%)", min_value=0, max_value=100, value=60)
-wind_speed = st.number_input("💨 Wind Speed (m/s)", min_value=0.0, max_value=20.0, value=2.0)
+temperature = st.number_input(" Temperature (°C)", min_value=-10.0, max_value=50.0, value=25.0)
+humidity = st.number_input("Humidity (%)", min_value=0, max_value=100, value=60)
+wind_speed = st.number_input(" Wind Speed (m/s)", min_value=0.0, max_value=20.0, value=2.0)
 pm2_5 = st.number_input("PM2.5 (µg/m³)", min_value=0.0, max_value=500.0, value=35.0)
 pm10 = st.number_input("PM10 (µg/m³)", min_value=0.0, max_value=600.0, value=50.0)
 co = st.number_input("CO (µg/m³)", min_value=0.0, max_value=2000.0, value=400.0)
