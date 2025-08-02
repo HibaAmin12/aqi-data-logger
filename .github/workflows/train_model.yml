@@ -35,6 +35,8 @@ jobs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
         git add models/aqi_best_model.pkl
-        git add *.png || true
-        git commit -m "Automated model training update (Random Forest saved)"
+        git add model_outputs/model_results.csv
+        git add model_outputs/*.png || true
+        git add latest_pollutants.csv
+        git commit -m "Automated model training update: Best model retrained & artifacts updated" || echo "No changes to commit"
         git push
