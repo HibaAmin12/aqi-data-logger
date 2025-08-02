@@ -1,85 +1,82 @@
 import streamlit as st
 import joblib
-import requests
-import numpy as np
-import hopsworks
 import pandas as pd
+import numpy as np
+import requests
 from datetime import datetime, timedelta
 
-# Load trained model
+# --------------------
+# Load Model & Data
+# --------------------
 model = joblib.load("models/aqi_best_model.pkl")
+latest_df = pd.read_csv("latest_pollutants.csv").iloc[0]  # Latest AQI + pollutants with lags
 
-# OpenWeather API details
-API_KEY = "16e3fa6809dc606fa5e160ea82e475d1"  # Replace with your key
-LAT, LON = 31.5497, 74.3436  # Lahore
+# OpenWeather API (Weather Forecast)
+API_KEY = "16e3fa6809dc606fa5e160ea82e475d1"
+LAT, LON = 31.5497, 74.3436  # Lahore Coordinates
 
-st.title("3-Day AQI Prediction")
+# --------------------
+# Streamlit UI
+# --------------------
+st.title("3-Day AQI Prediction (Lag-based Model)")
+st.write("This app predicts AQI for the next 3 days using weather forecasts and lagged AQI trends.")
 
-# ------------------------
-# Fetch latest pollutants from Hopsworks
-# ------------------------
-@st.cache_data
-def fetch_latest_pollutants():
-    project = hopsworks.login(api_key_value=st.secrets["HOPSWORKS_API_KEY"], 
-                              project="Api_feature_store", 
-                              host="c.app.hopsworks.ai")
-    fs = project.get_feature_store()
-    fg = fs.get_feature_group("aqi_features", version=1)
-    df = fg.read()
-    df = df.dropna(subset=["aqi"])
-    latest = df.sort_values("timestamp", ascending=False).iloc[0]
-    return {
-        "pm2_5": latest["pm2_5"],
-        "pm10": latest["pm10"],
-        "co": latest["co"],
-        "no2": latest["no2"]
-    }
-
-pollutants = fetch_latest_pollutants()
-
-# ------------------------
-# Fetch 3-day weather forecast
-# ------------------------
-def fetch_weather_forecast():
+# --------------------
+# Fetch 3-Day Weather Forecast
+# --------------------
+def fetch_weather():
     url = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
     resp = requests.get(url).json()
     forecast = []
-    for i in range(0, 24, 8):  # 3 days, every 24h step from forecast
-        if "list" in resp and len(resp["list"]) > i:
-            entry = resp["list"][i]
-            forecast.append({
-                "temp": entry["main"]["temp"],
-                "humidity": entry["main"]["humidity"],
-                "wind": entry["wind"]["speed"]
-            })
+    for i in range(0, 24, 8):  # Every 24h → 3 points for 3 days
+        entry = resp["list"][i]
+        forecast.append({
+            "temp": entry["main"]["temp"],
+            "humidity": entry["main"]["humidity"],
+            "wind": entry["wind"]["speed"]
+        })
     return forecast
 
-if st.button("Predict Next 3 Days AQI"):
-    weather = fetch_weather_forecast()
-    predictions = {}
+# --------------------
+# Prediction Logic (Recursive with Lag)
+# --------------------
+if st.button("Predict AQI for Next 3 Days"):
+    forecast = fetch_weather()
 
-    pm2_5 = pollutants["pm2_5"]
-    pm10 = pollutants["pm10"]
-    co = pollutants["co"]
-    no2 = pollutants["no2"]
+    # Initialize lags from latest CSV
+    aqi_lag = latest_df["aqi"]
+    pm2_5_lag, pm10_lag, co_lag, no2_lag = latest_df["pm2_5"], latest_df["pm10"], latest_df["co"], latest_df["no2"]
+
+    predictions = {}
 
     for i in range(3):
         day = datetime.today() + timedelta(days=i)
-        temp = weather[i]["temp"]
-        hum = weather[i]["humidity"]
-        wind = weather[i]["wind"]
+        temp = forecast[i]["temp"]
+        hum = forecast[i]["humidity"]
+        wind = forecast[i]["wind"]
 
-        features = np.array([[temp, hum, wind, pm2_5, pm10, co, no2]])
+        # Feature vector (weather + pollutants + lagged AQI/pollutants)
+        features = np.array([[
+            temp, hum, wind,
+            pm2_5_lag, pm10_lag, co_lag, no2_lag,
+            aqi_lag, pm2_5_lag, pm10_lag, co_lag, no2_lag
+        ]])
+
+        # Predict AQI
         pred_aqi = model.predict(features)[0]
         predictions[day.strftime("%Y-%m-%d")] = pred_aqi
 
-        # Recursive pollutant adjustment (model-driven)
-        pm2_5 *= 0.98  # small decay
-        pm10 *= 0.98
-        co *= 0.99
-        no2 *= 0.99
+        # Update lags for next day
+        aqi_lag = pred_aqi  # Predicted AQI becomes next day's lag
+        # Pollutants decay slightly (realistic approximation)
+        pm2_5_lag *= 0.98
+        pm10_lag *= 0.98
+        co_lag *= 0.99
+        no2_lag *= 0.99
 
-    # Display predictions
+    # --------------------
+    # Display Results
+    # --------------------
     for date, aqi in predictions.items():
         st.write(f"{date} → Predicted AQI: {aqi:.2f}")
         if aqi <= 50:
