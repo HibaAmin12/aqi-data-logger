@@ -1,0 +1,9 @@
+hopsworks==4.2.*
+pyarrow
+streamlit
+pandas
+numpy
+requests
+joblib
+scikit-learn
+xgboost
