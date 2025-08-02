@@ -1,51 +1,46 @@
 import streamlit as st
 import joblib
+import requests
 import numpy as np
 from datetime import datetime, timedelta
 
-# Load trained model
+API_KEY = "16e3fa6809dc606fa5e160ea82e475d1"
+LAT, LON = 31.5497, 74.3436  # Lahore example (replace with user city)
+
+# Load model
 model = joblib.load("models/aqi_best_model.pkl")
 
-# Title
-st.title(" 3-Day AQI Prediction App")
-st.markdown("Enter today's weather and pollutant data to predict AQI for the next 3 days.")
+st.title("🌍 3-Day AQI Prediction (Auto)")
 
-# Date Selection
-start_date = st.date_input("Select Base Date:", datetime.today())
+if st.button("Predict Next 3 Days AQI"):
+    # Fetch 3-day weather forecast
+    forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
+    weather_data = requests.get(forecast_url).json()
 
-# Input fields
-temperature = st.number_input(" Temperature (°C)", min_value=-10.0, max_value=50.0, value=25.0)
-humidity = st.number_input("Humidity (%)", min_value=0, max_value=100, value=60)
-wind_speed = st.number_input(" Wind Speed (m/s)", min_value=0.0, max_value=20.0, value=2.0)
-pm2_5 = st.number_input("PM2.5 (µg/m³)", min_value=0.0, max_value=500.0, value=35.0)
-pm10 = st.number_input("PM10 (µg/m³)", min_value=0.0, max_value=600.0, value=50.0)
-co = st.number_input("CO (µg/m³)", min_value=0.0, max_value=2000.0, value=400.0)
-no2 = st.number_input("NO₂ (µg/m³)", min_value=0.0, max_value=200.0, value=10.0)
+    # Fetch current pollution data
+    pollution_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={API_KEY}"
+    pollution_data = requests.get(pollution_url).json()
+    components = pollution_data["list"][0]["components"]
 
-# Predict Button
-if st.button("Predict 3-Day AQI"):
-    features = np.array([[temperature, humidity, wind_speed, pm2_5, pm10, co, no2]])
-    
+    pm2_5, pm10, co, no2 = components["pm2_5"], components["pm10"], components["co"], components["no2"]
+
     predictions = {}
     for i in range(3):
-        day = start_date + timedelta(days=i)
-        prediction = model.predict(features)[0]
-        predictions[day.strftime("%Y-%m-%d")] = prediction
+        day = datetime.today() + timedelta(days=i)
+        temp = weather_data["list"][i*8]["main"]["temp"]
+        hum = weather_data["list"][i*8]["humidity"]
+        wind = weather_data["list"][i*8]["wind"]["speed"]
 
-    # Display Results
-    for date, pred in predictions.items():
-        st.write(f"📅 **{date}** → Predicted AQI: **{pred:.2f}**")
-        
-        # AQI Levels
-        if pred <= 50:
-            st.success("🟢 Good")
-        elif pred <= 100:
-            st.info("🟡 Moderate")
-        elif pred <= 150:
-            st.warning("🟠 Unhealthy for Sensitive Groups")
-        elif pred <= 200:
-            st.warning("🔴 Unhealthy")
-        elif pred <= 300:
-            st.error("🟣 Very Unhealthy")
-        else:
-            st.error("⚫ Hazardous")
+        features = np.array([[temp, hum, wind, pm2_5, pm10, co, no2]])
+        pred = model.predict(features)[0]
+        predictions[day.strftime("%Y-%m-%d")] = pred
+
+    # Show results
+    for date, aqi in predictions.items():
+        st.write(f"📅 **{date}** → Predicted AQI: **{aqi:.2f}**")
+        if aqi <= 50: st.success("🟢 Good")
+        elif aqi <= 100: st.info("🟡 Moderate")
+        elif aqi <= 150: st.warning("🟠 Unhealthy for Sensitive Groups")
+        elif aqi <= 200: st.warning("🔴 Unhealthy")
+        elif aqi <= 300: st.error("🟣 Very Unhealthy")
+        else: st.error("⚫ Hazardous")
