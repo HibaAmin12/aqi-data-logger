@@ -2,52 +2,95 @@ import streamlit as st
 import joblib
 import requests
 import numpy as np
+import hopsworks
+import pandas as pd
 from datetime import datetime, timedelta
 
-API_KEY = "16e3fa6809dc606fa5e160ea82e475d1"  
-LAT, LON = 31.5497, 74.3436  
-
+# Load trained model
 model = joblib.load("models/aqi_best_model.pkl")
-st.title("3-Day AQI Prediction (Auto)")
+
+# OpenWeather API details
+API_KEY = "16e3fa6809dc606fa5e160ea82e475d1"  # Replace with your key
+LAT, LON = 31.5497, 74.3436  # Lahore
+
+st.title("3-Day AQI Prediction")
+
+# ------------------------
+# Fetch latest pollutants from Hopsworks
+# ------------------------
+@st.cache_data
+def fetch_latest_pollutants():
+    project = hopsworks.login(api_key_value=st.secrets["HOPSWORKS_API_KEY"], 
+                              project="Api_feature_store", 
+                              host="c.app.hopsworks.ai")
+    fs = project.get_feature_store()
+    fg = fs.get_feature_group("aqi_features", version=1)
+    df = fg.read()
+    df = df.dropna(subset=["aqi"])
+    latest = df.sort_values("timestamp", ascending=False).iloc[0]
+    return {
+        "pm2_5": latest["pm2_5"],
+        "pm10": latest["pm10"],
+        "co": latest["co"],
+        "no2": latest["no2"]
+    }
+
+pollutants = fetch_latest_pollutants()
+
+# ------------------------
+# Fetch 3-day weather forecast
+# ------------------------
+def fetch_weather_forecast():
+    url = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
+    resp = requests.get(url).json()
+    forecast = []
+    for i in range(0, 24, 8):  # 3 days, every 24h step from forecast
+        if "list" in resp and len(resp["list"]) > i:
+            entry = resp["list"][i]
+            forecast.append({
+                "temp": entry["main"]["temp"],
+                "humidity": entry["main"]["humidity"],
+                "wind": entry["wind"]["speed"]
+            })
+    return forecast
 
 if st.button("Predict Next 3 Days AQI"):
-    forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
-    weather_response = requests.get(forecast_url)
-    
-    if weather_response.status_code != 200:
-        st.error(f"Weather API Error: {weather_response.json().get('message', 'Unknown error')}")
-    else:
-        weather_data = weather_response.json()
+    weather = fetch_weather_forecast()
+    predictions = {}
 
-        if "list" not in weather_data:
-            st.error("Weather forecast data not available.")
+    pm2_5 = pollutants["pm2_5"]
+    pm10 = pollutants["pm10"]
+    co = pollutants["co"]
+    no2 = pollutants["no2"]
+
+    for i in range(3):
+        day = datetime.today() + timedelta(days=i)
+        temp = weather[i]["temp"]
+        hum = weather[i]["humidity"]
+        wind = weather[i]["wind"]
+
+        features = np.array([[temp, hum, wind, pm2_5, pm10, co, no2]])
+        pred_aqi = model.predict(features)[0]
+        predictions[day.strftime("%Y-%m-%d")] = pred_aqi
+
+        # Recursive pollutant adjustment (model-driven)
+        pm2_5 *= 0.98  # small decay
+        pm10 *= 0.98
+        co *= 0.99
+        no2 *= 0.99
+
+    # Display predictions
+    for date, aqi in predictions.items():
+        st.write(f"{date} → Predicted AQI: {aqi:.2f}")
+        if aqi <= 50:
+            st.write("Good")
+        elif aqi <= 100:
+            st.write("Moderate")
+        elif aqi <= 150:
+            st.write("Unhealthy for Sensitive Groups")
+        elif aqi <= 200:
+            st.write("Unhealthy")
+        elif aqi <= 300:
+            st.write("Very Unhealthy")
         else:
-            pollution_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={API_KEY}"
-            pollution_response = requests.get(pollution_url)
-            
-            if pollution_response.status_code != 200:
-                st.error(f"Pollution API Error: {pollution_response.json().get('message', 'Unknown error')}")
-            else:
-                components = pollution_response.json()["list"][0]["components"]
-                pm2_5, pm10, co, no2 = components["pm2_5"], components["pm10"], components["co"], components["no2"]
-
-                predictions = {}
-                for i in range(3):
-                    if i*8 < len(weather_data["list"]):
-                        day = datetime.today() + timedelta(days=i)
-                        temp = weather_data["list"][i*8]["main"]["temp"]
-                        hum = weather_data["list"][i*8]["main"]["humidity"]
-                        wind = weather_data["list"][i*8]["wind"]["speed"]
-
-                        features = np.array([[temp, hum, wind, pm2_5, pm10, co, no2]])
-                        pred = model.predict(features)[0]
-                        predictions[day.strftime("%Y-%m-%d")] = pred
-
-                for date, aqi in predictions.items():
-                    st.write(f"{date} → Predicted AQI: {aqi:.2f}")
-                    if aqi <= 50: st.write("Good")
-                    elif aqi <= 100: st.write("Moderate")
-                    elif aqi <= 150: st.write("Unhealthy for Sensitive Groups")
-                    elif aqi <= 200: st.write("Unhealthy")
-                    elif aqi <= 300: st.write("Very Unhealthy")
-                    else: st.write("Hazardous")
+            st.write("Hazardous")
