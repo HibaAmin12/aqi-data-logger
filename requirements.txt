@@ -1,9 +1,10 @@
 hopsworks==4.2.*
 pyarrow
+streamlit
 pandas
 numpy
-scikit-learn
-joblib
 requests
-streamlit
+joblib
+scikit-learn
 xgboost
+
