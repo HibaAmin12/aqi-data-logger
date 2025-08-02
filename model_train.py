@@ -38,7 +38,6 @@ df["pm10_lag1"] = df["pm10"].shift(1)
 df["co_lag1"] = df["co"].shift(1)
 df["no2_lag1"] = df["no2"].shift(1)
 
-# Drop rows with NaN (first lagged row)
 df = df.dropna().reset_index(drop=True)
 
 # --------------------
@@ -65,7 +64,7 @@ scaler = StandardScaler()
 df[numeric_features] = scaler.fit_transform(df[numeric_features])
 
 # --------------------
-# Final Features (including lagged pollutants)
+# Features and Target
 # --------------------
 features = numeric_features + ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
 X = df[features]
@@ -88,6 +87,9 @@ models = {
 }
 
 results = {}
+best_model_name = None
+best_model = None
+best_r2 = -1
 
 for name, model in models.items():
     model.fit(X_train, y_train)
@@ -99,6 +101,12 @@ for name, model in models.items():
 
     results[name] = {"MSE": mse, "R²": r2, "Correlation": corr}
 
+    # Track best model based on R²
+    if r2 > best_r2:
+        best_r2 = r2
+        best_model_name = name
+        best_model = model
+
 # --------------------
 # Save Results & Plots
 # --------------------
@@ -109,7 +117,7 @@ print(results_df)
 os.makedirs("model_outputs", exist_ok=True)
 results_df.to_csv("model_outputs/model_results.csv")
 
-# Plot R² Comparison
+# R² Plot
 plt.figure(figsize=(8, 5))
 plt.bar(results_df.index, results_df["R²"], color='skyblue')
 plt.title("R² Score Comparison of Models")
@@ -120,7 +128,7 @@ plt.tight_layout()
 plt.savefig("model_outputs/r2_comparison.png")
 plt.close()
 
-# Plot MSE Comparison
+# MSE Plot
 plt.figure(figsize=(8, 5))
 plt.bar(results_df.index, results_df["MSE"], color='salmon')
 plt.title("MSE Comparison of Models")
@@ -131,18 +139,18 @@ plt.savefig("model_outputs/mse_comparison.png")
 plt.close()
 
 # --------------------
-# Save Best Model (Random Forest)
+# Save Best Model Automatically
 # --------------------
-best_model = RandomForestRegressor(n_estimators=100, random_state=42)
+print(f"\n Best model selected: {best_model_name} (R²: {best_r2:.4f})")
 best_model.fit(X, y)
 
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/aqi_best_model.pkl")
-print("\nBest model (Random Forest with lag features) saved in 'models/aqi_best_model.pkl'")
+print(" Best model saved to 'models/aqi_best_model.pkl'")
 
 # --------------------
-# Save Latest Row (For Streamlit Recursive Forecast)
+# Save Latest Row for Streamlit
 # --------------------
 latest = df.iloc[-1]
 latest.to_frame().T.to_csv("latest_pollutants.csv", index=False)
-print("Latest pollutants and AQI saved to 'latest_pollutants.csv'")
+print(" Latest pollutants and AQI saved to 'latest_pollutants.csv'")
