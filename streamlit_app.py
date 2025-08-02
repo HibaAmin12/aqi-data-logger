@@ -1,51 +1,51 @@
 import streamlit as st
-import numpy as np
 import joblib
-import os
+import numpy as np
+from datetime import datetime, timedelta
 
-# 🎯 Load trained model
-@st.cache_resource
-def load_model():
-    model_path = "model_outputs/best_model.pkl"
-    if not os.path.exists(model_path):
-        st.error("❌ Trained model not found in 'model_outputs/'. Please ensure best_model.pkl is present.")
-        return None
-    return joblib.load(model_path)
+# Load trained model
+model = joblib.load("models/aqi_best_model.pkl")
 
-model = load_model()
+# Title
+st.title("🌍 3-Day AQI Prediction App")
+st.markdown("Enter today's weather and pollutant data to predict AQI for the next 3 days.")
 
-# 🖥️ UI
-st.title("🌫️ AQI Predictor (Next 3 Days)")
-st.write("Enter today's environmental conditions to forecast AQI for the next 3 days.")
+# Date Selection
+start_date = st.date_input("📅 Select Base Date:", datetime.today())
 
-temperature = st.slider("🌡️ Temperature (°C)", 0.0, 50.0, 25.0)
-humidity    = st.slider("💧 Humidity (%)",       0,   100,  60)
-wind_speed  = st.slider("🌬️ Wind Speed (m/s)",   0.0, 20.0, 2.0)
-co          = st.number_input("CO (µg/m³)",       0.0, 1000.0,400.0)
-no2         = st.number_input("NO₂ (µg/m³)",      0.0, 200.0, 10.0)
+# Input fields
+temperature = st.number_input("🌡 Temperature (°C)", min_value=-10.0, max_value=50.0, value=25.0)
+humidity = st.number_input("💧 Humidity (%)", min_value=0, max_value=100, value=60)
+wind_speed = st.number_input("💨 Wind Speed (m/s)", min_value=0.0, max_value=20.0, value=2.0)
+pm2_5 = st.number_input("PM2.5 (µg/m³)", min_value=0.0, max_value=500.0, value=35.0)
+pm10 = st.number_input("PM10 (µg/m³)", min_value=0.0, max_value=600.0, value=50.0)
+co = st.number_input("CO (µg/m³)", min_value=0.0, max_value=2000.0, value=400.0)
+no2 = st.number_input("NO₂ (µg/m³)", min_value=0.0, max_value=200.0, value=10.0)
 
-# Prepare input
-input_vec = np.array([[temperature, humidity, wind_speed, co, no2]])
+# Predict Button
+if st.button("Predict 3-Day AQI"):
+    features = np.array([[temperature, humidity, wind_speed, pm2_5, pm10, co, no2]])
+    
+    predictions = {}
+    for i in range(3):
+        day = start_date + timedelta(days=i)
+        prediction = model.predict(features)[0]
+        predictions[day.strftime("%Y-%m-%d")] = prediction
 
-if st.button("🔮 Predict AQI for Next 3 Days"):
-    if model is None:
-        st.warning("⚠️ Model not loaded.")
-    else:
-        preds = model.predict(input_vec)[0]
-        st.subheader("📈 Forecasted AQI Values")
-        st.write(f"• **Day 1:** {preds[0]:.2f}")
-        st.write(f"• **Day 2:** {preds[1]:.2f}")
-        st.write(f"• **Day 3:** {preds[2]:.2f}")
-
-        def aqi_category(aqi):
-            if aqi <= 50:   return "Good 😊"
-            if aqi <= 100:  return "Moderate 😐"
-            if aqi <= 150:  return "Unhealthy for Sensitive Groups 😷"
-            if aqi <= 200:  return "Unhealthy 😷"
-            if aqi <= 300:  return "Very Unhealthy 😫"
-            return "Hazardous ☠️"
-
-        st.subheader("🏷️ AQI Categories")
-        st.write(f"Day 1: {aqi_category(preds[0])}")
-        st.write(f"Day 2: {aqi_category(preds[1])}")
-        st.write(f"Day 3: {aqi_category(preds[2])}")
+    # Display Results
+    for date, pred in predictions.items():
+        st.write(f"📅 **{date}** → Predicted AQI: **{pred:.2f}**")
+        
+        # AQI Levels
+        if pred <= 50:
+            st.success("🟢 Good")
+        elif pred <= 100:
+            st.info("🟡 Moderate")
+        elif pred <= 150:
+            st.warning("🟠 Unhealthy for Sensitive Groups")
+        elif pred <= 200:
+            st.warning("🔴 Unhealthy")
+        elif pred <= 300:
+            st.error("🟣 Very Unhealthy")
+        else:
+            st.error("⚫ Hazardous")
