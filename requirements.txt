@@ -1,8 +1,8 @@
-
+hopsworks==4.2.*
+pyarrow
 pandas
 numpy
 scikit-learn
-scipy
 joblib
-matplotlib
+requests
 streamlit
