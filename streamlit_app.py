@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime, timedelta
 
 API_KEY = "16e3fa6809dc606fa5e160ea82e475d1"
-LAT, LON = 31.5497, 74.3436  # Lahore example (replace with user city)
+LAT, LON = 31.5497, 74.3436  # Lahore
 
 # Load model
 model = joblib.load("models/aqi_best_model.pkl")
@@ -25,15 +25,19 @@ if st.button("Predict Next 3 Days AQI"):
     pm2_5, pm10, co, no2 = components["pm2_5"], components["pm10"], components["co"], components["no2"]
 
     predictions = {}
-    for i in range(3):
-        day = datetime.today() + timedelta(days=i)
-        temp = weather_data["list"][i*8]["main"]["temp"]
-        hum = weather_data["list"][i*8]["humidity"]
-        wind = weather_data["list"][i*8]["wind"]["speed"]
+for i in range(3):
+    day = datetime.today() + timedelta(days=i)
+    
+    # Access correct fields from forecast JSON
+    temp = weather_data["list"][i*8]["main"]["temp"]
+    hum = weather_data["list"][i*8]["main"]["humidity"]  
+    wind = weather_data["list"][i*8]["wind"]["speed"]
+    
+    # AQI features (weather + pollutants)
+    features = np.array([[temp, hum, wind, pm2_5, pm10, co, no2]])
+    pred = model.predict(features)[0]
+    predictions[day.strftime("%Y-%m-%d")] = pred
 
-        features = np.array([[temp, hum, wind, pm2_5, pm10, co, no2]])
-        pred = model.predict(features)[0]
-        predictions[day.strftime("%Y-%m-%d")] = pred
 
     # Show results
     for date, aqi in predictions.items():
