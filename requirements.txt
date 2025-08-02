@@ -1,5 +1,4 @@
-hopsworks==4.2.*
-pyarrow
+
 streamlit
 pandas
 numpy
