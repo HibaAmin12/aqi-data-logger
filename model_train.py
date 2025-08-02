@@ -26,8 +26,20 @@ fs = project.get_feature_store()
 # Load Data from Feature Store
 # --------------------
 fg = fs.get_feature_group("aqi_features", version=1)
-df = fg.read()
+df = fg.read().sort_values("timestamp")
 df = df.dropna(subset=["aqi"])
+
+# --------------------
+# Add Lag Features
+# --------------------
+df["aqi_lag1"] = df["aqi"].shift(1)
+df["pm2_5_lag1"] = df["pm2_5"].shift(1)
+df["pm10_lag1"] = df["pm10"].shift(1)
+df["co_lag1"] = df["co"].shift(1)
+df["no2_lag1"] = df["no2"].shift(1)
+
+# Drop rows with NaN (first lagged row)
+df = df.dropna().reset_index(drop=True)
 
 # --------------------
 # Outlier Capping
@@ -53,12 +65,15 @@ scaler = StandardScaler()
 df[numeric_features] = scaler.fit_transform(df[numeric_features])
 
 # --------------------
-# Features and Target
+# Final Features (including lagged pollutants)
 # --------------------
-X = df[numeric_features]
+features = numeric_features + ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
+X = df[features]
 y = df["aqi"]
 
-# Split data
+# --------------------
+# Train-Test Split
+# --------------------
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # --------------------
@@ -123,4 +138,11 @@ best_model.fit(X, y)
 
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/aqi_best_model.pkl")
-print("\n✅ Best model (Random Forest) saved in 'models/aqi_best_model.pkl'")
+print("\nBest model (Random Forest with lag features) saved in 'models/aqi_best_model.pkl'")
+
+# --------------------
+# Save Latest Row (For Streamlit Recursive Forecast)
+# --------------------
+latest = df.iloc[-1]
+latest.to_frame().T.to_csv("latest_pollutants.csv", index=False)
+print("Latest pollutants and AQI saved to 'latest_pollutants.csv'")
