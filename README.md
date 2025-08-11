@@ -1,1 +1,1 @@
-For predicting AQI using streamlit:https://aqi-data-logger-hibaamin.streamlit.app/
+For predicting AQI using streamlit:https://aqi-data-logger-hiba.streamlit.app/
