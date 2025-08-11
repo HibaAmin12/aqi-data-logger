@@ -30,13 +30,14 @@ jobs:
       run: |
         python model_train.py
 
-    - name: Commit Trained Model and Results
+    - name: Commit Trained Model, Scaler and Results
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
         git add models/aqi_best_model.pkl
+        git add models/scaler.pkl
         git add model_outputs/model_results.csv
         git add model_outputs/*.png || true
         git add latest_pollutants.csv
-        git commit -m "Automated model training update: Best model retrained & artifacts updated" || echo "No changes to commit"
+        git commit -m "Automated model training update: Best model & scaler retrained, artifacts updated" || echo "No changes to commit"
         git push
