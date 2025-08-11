@@ -13,6 +13,7 @@ scaler = joblib.load("models/scaler.pkl")
 
 # Columns to scale (same as training)
 numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+required_columns = numeric_features + ["aqi", "timestamp"]
 
 # --------------------
 # Load latest pollutant data
@@ -27,7 +28,14 @@ else:
         latest_data.to_csv("latest_pollutants.csv", index=False)
         st.success("✅ File uploaded and saved.")
     else:
-        st.stop()  # Stop the app until file is provided
+        st.stop()  # Stop until file is provided
+
+# --------------------
+# Validate CSV columns
+# --------------------
+if not set(required_columns).issubset(latest_data.columns):
+    st.error(f"Uploaded CSV must contain these columns: {required_columns}")
+    st.stop()
 
 # --------------------
 # Prepare input features for prediction
@@ -35,7 +43,12 @@ else:
 def prepare_features(input_df, prev_aqi, prev_pm2_5, prev_pm10, prev_co, prev_no2):
     df = input_df.copy()
 
-    # Scale numeric features using loaded scaler
+    # Ensure no missing numeric data
+    if df[numeric_features].isnull().any().any():
+        st.error("Numeric feature columns contain missing values.")
+        st.stop()
+
+    # Scale numeric features
     df[numeric_features] = scaler.transform(df[numeric_features])
 
     # Add lag features
@@ -106,9 +119,10 @@ This dashboard predicts Air Quality Index (AQI) for the next 3 days using the tr
 st.subheader("Latest Pollutant and Weather Data")
 st.dataframe(latest_data)
 
-pred_df = predict_next_days(latest_data.iloc[0])
-
-st.subheader("AQI Predictions for Next 3 Days")
-st.table(pred_df)
-
-st.line_chart(pred_df.set_index("date")["predicted_aqi"])
+try:
+    pred_df = predict_next_days(latest_data.iloc[0])
+    st.subheader("AQI Predictions for Next 3 Days")
+    st.table(pred_df)
+    st.line_chart(pred_df.set_index("date")["predicted_aqi"])
+except Exception as e:
+    st.error(f"Prediction failed: {e}")
