@@ -7,4 +7,4 @@ xgboost==2.1.1
 matplotlib==3.9.1
 seaborn==0.13.2
 sweetviz==2.3.1
-hopsworks==3.8.0
+hopsworks>=3.7.0
