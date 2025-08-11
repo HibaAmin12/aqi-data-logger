@@ -1,128 +1,57 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
-from datetime import timedelta
-import os
+import numpy as np
+import datetime
 
-# --------------------
-# Load model and scaler
-# --------------------
+# -------------------
+# Load Model & Scaler
+# -------------------
 model = joblib.load("models/aqi_best_model.pkl")
 scaler = joblib.load("models/scaler.pkl")
 
-# Columns to scale (same as training)
+# -------------------
+# Load Latest Data
+# -------------------
+latest_data = pd.read_csv("latest_pollutants.csv")
+
+# Features for prediction
 numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
-required_columns = numeric_features + ["aqi", "timestamp"]
+lag_features = ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
 
-# --------------------
-# Load latest pollutant data
-# --------------------
-if os.path.exists("latest_pollutants.csv"):
-    latest_data = pd.read_csv("latest_pollutants.csv")
-else:
-    st.warning("⚠️ latest_pollutants.csv not found. Please upload the latest data file.")
-    uploaded_file = st.file_uploader("Upload latest_pollutants.csv", type=["csv"])
-    if uploaded_file is not None:
-        latest_data = pd.read_csv(uploaded_file)
-        latest_data.to_csv("latest_pollutants.csv", index=False)
-        st.success("✅ File uploaded and saved.")
-    else:
-        st.stop()  # Stop until file is provided
+# Scale numeric features
+latest_data[numeric_features] = scaler.transform(latest_data[numeric_features])
 
-# --------------------
-# Validate CSV columns
-# --------------------
-if not set(required_columns).issubset(latest_data.columns):
-    st.error(f"Uploaded CSV must contain these columns: {required_columns}")
-    st.stop()
+# -------------------
+# Predict Next 3 Days
+# -------------------
+predictions = []
+current_features = latest_data.copy()
 
-# --------------------
-# Prepare input features for prediction
-# --------------------
-def prepare_features(input_df, prev_aqi, prev_pm2_5, prev_pm10, prev_co, prev_no2):
-    df = input_df.copy()
+for i in range(1, 4):  # 3 days
+    pred_aqi = model.predict(current_features[numeric_features + lag_features])[0]
+    predictions.append({
+        "Date": (datetime.datetime.now() + datetime.timedelta(days=i)).strftime("%Y-%m-%d"),
+        "Predicted AQI": round(pred_aqi, 2)
+    })
 
-    # Ensure no missing numeric data
-    if df[numeric_features].isnull().any().any():
-        st.error("Numeric feature columns contain missing values.")
-        st.stop()
+    # Update lag features for next day prediction
+    current_features["aqi_lag1"] = pred_aqi
+    # For simplicity, keep pollutant lag features same
+    current_features["pm2_5_lag1"] = current_features["pm2_5"].iloc[0]
+    current_features["pm10_lag1"] = current_features["pm10"].iloc[0]
+    current_features["co_lag1"] = current_features["co"].iloc[0]
+    current_features["no2_lag1"] = current_features["no2"].iloc[0]
 
-    # Scale numeric features
-    df[numeric_features] = scaler.transform(df[numeric_features])
-
-    # Add lag features
-    df["aqi_lag1"] = prev_aqi
-    df["pm2_5_lag1"] = prev_pm2_5
-    df["pm10_lag1"] = prev_pm10
-    df["co_lag1"] = prev_co
-    df["no2_lag1"] = prev_no2
-
-    features = numeric_features + ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
-    return df[features]
-
-# --------------------
-# Predict AQI for next N days
-# --------------------
-def predict_next_days(latest_row, days=3):
-    predictions = []
-
-    prev_aqi = latest_row["aqi"]
-    prev_pm2_5 = latest_row["pm2_5"]
-    prev_pm10 = latest_row["pm10"]
-    prev_co = latest_row["co"]
-    prev_no2 = latest_row["no2"]
-
-    current_date = pd.to_datetime(latest_row["timestamp"])
-
-    for i in range(1, days + 1):
-        next_date = current_date + timedelta(days=i)
-
-        input_data = {
-            "temperature": [latest_row["temperature"]],
-            "humidity": [latest_row["humidity"]],
-            "wind_speed": [latest_row["wind_speed"]],
-            "pm2_5": [latest_row["pm2_5"]],
-            "pm10": [latest_row["pm10"]],
-            "co": [latest_row["co"]],
-            "no2": [latest_row["no2"]],
-        }
-        input_df = pd.DataFrame(input_data)
-
-        X_pred = prepare_features(input_df, prev_aqi, prev_pm2_5, prev_pm10, prev_co, prev_no2)
-
-        pred_aqi = model.predict(X_pred)[0]
-
-        predictions.append({
-            "date": next_date.strftime("%Y-%m-%d"),
-            "predicted_aqi": pred_aqi
-        })
-
-        # Update lag values for next prediction
-        prev_aqi = pred_aqi
-        prev_pm2_5 = latest_row["pm2_5"]
-        prev_pm10 = latest_row["pm10"]
-        prev_co = latest_row["co"]
-        prev_no2 = latest_row["no2"]
-
-    return pd.DataFrame(predictions)
-
-# --------------------
+# -------------------
 # Streamlit UI
-# --------------------
-st.title("3-Day AQI Forecast Dashboard")
+# -------------------
+st.title("🌍 Lahore AQI Forecast Dashboard")
+st.subheader("Latest Recorded AQI")
+st.metric(label="Current AQI", value=round(latest_data["aqi"].iloc[0], 2))
 
-st.markdown("""
-This dashboard predicts Air Quality Index (AQI) for the next 3 days using the trained model and latest pollutant/weather data.
-""")
+st.subheader("📅 Next 3 Days Forecast")
+df_pred = pd.DataFrame(predictions)
+st.table(df_pred)
 
-st.subheader("Latest Pollutant and Weather Data")
-st.dataframe(latest_data)
-
-try:
-    pred_df = predict_next_days(latest_data.iloc[0])
-    st.subheader("AQI Predictions for Next 3 Days")
-    st.table(pred_df)
-    st.line_chart(pred_df.set_index("date")["predicted_aqi"])
-except Exception as e:
-    st.error(f"Prediction failed: {e}")
+st.line_chart(df_pred.set_index("Date")["Predicted AQI"])
