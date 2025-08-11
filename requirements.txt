@@ -1,9 +1,11 @@
-hopsworks==4.2.*
 streamlit
-pandas
-numpy
-requests
+hopsworks>=4.2
 joblib
 scikit-learn
+pandas
+numpy
+matplotlib
+seaborn
+python-dotenv
 xgboost
 SQLAlchemy<2.0
