@@ -1,7 +1,5 @@
-confluent-kafka[avro]==2.3.0 --only-binary=:all:
 streamlit==1.22.0
 pandas==1.5.3
-hopsworks==3.7.0
 joblib
 scikit-learn
 numpy
