@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 from datetime import timedelta
+import os
 
 # --------------------
 # Load model and scaler
@@ -10,13 +11,23 @@ from datetime import timedelta
 model = joblib.load("models/aqi_best_model.pkl")
 scaler = joblib.load("models/scaler.pkl")
 
-# --------------------
-# Load latest pollutant data (latest_pollutants.csv)
-# --------------------
-latest_data = pd.read_csv("latest_pollutants.csv")
-
 # Columns to scale (same as training)
 numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+
+# --------------------
+# Load latest pollutant data
+# --------------------
+if os.path.exists("latest_pollutants.csv"):
+    latest_data = pd.read_csv("latest_pollutants.csv")
+else:
+    st.warning("⚠️ latest_pollutants.csv not found. Please upload the latest data file.")
+    uploaded_file = st.file_uploader("Upload latest_pollutants.csv", type=["csv"])
+    if uploaded_file is not None:
+        latest_data = pd.read_csv(uploaded_file)
+        latest_data.to_csv("latest_pollutants.csv", index=False)
+        st.success("✅ File uploaded and saved.")
+    else:
+        st.stop()  # Stop the app until file is provided
 
 # --------------------
 # Prepare input features for prediction
