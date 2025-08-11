@@ -16,12 +16,12 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: "3.10"
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install "hopsworks[python]==4.2.*" pyarrow scikit-learn xgboost joblib matplotlib pandas numpy seaborn
+        pip install --upgrade pip
+        pip install "hopsworks[python]" pyarrow scikit-learn xgboost joblib matplotlib pandas numpy seaborn
 
     - name: Train and Evaluate Models
       env:
@@ -31,7 +31,7 @@ jobs:
       run: |
         python model_train.py
 
-    - name: Commit Trained Model, Scaler and Results
+    - name: Commit Trained Model, Scaler, Results & Processed Data
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
@@ -40,6 +40,6 @@ jobs:
         git add model_outputs/model_results.csv
         git add model_outputs/*.png || true
         git add latest_pollutants.csv
-        git add processed_data.csv || true
-        git commit -m "Automated model training update: Best model, scaler, processed data & artifacts updated" || echo "No changes to commit"
+        git add processed_data.csv
+        git commit -m "Automated update: Model, scaler, results & processed data updated" || echo "No changes to commit"
         git push
