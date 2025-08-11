@@ -2,8 +2,31 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
-from datetime import timedelta
-from model_train import preprocess_data  # same preprocessing as training
+import datetime
+import os
+
+# --------------------
+# Preprocessing Function (copied from training)
+# --------------------
+def preprocess_data(df):
+    # Lag features
+    for col in ["aqi", "pm2_5", "pm10", "co", "no2"]:
+        df[f"{col}_lag1"] = df[col].shift(1)
+
+    df = df.dropna().reset_index(drop=True)
+
+    # Outlier Capping
+    def cap_outliers(data, cols):
+        for col in cols:
+            Q1, Q3 = data[col].quantile(0.25), data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+            data[col] = np.clip(data[col], lower, upper)
+        return data
+
+    df = cap_outliers(df, ["pm2_5", "pm10", "wind_speed"])
+
+    return df
 
 # --------------------
 # Load Model & Scaler
@@ -12,71 +35,48 @@ model = joblib.load("models/aqi_best_model.pkl")
 scaler = joblib.load("models/scaler.pkl")
 
 # --------------------
-# Load Latest Data
+# Load Data
 # --------------------
-df_raw = pd.read_csv("latest_pollutants.csv")
-df_all = pd.read_csv("eda_outputs/standardized_data.csv") if "eda_outputs/standardized_data.csv" else None
+df = pd.read_csv("api.csv")  # Full historical data
+df = df.dropna(subset=["aqi"])
+df = preprocess_data(df)
 
-if df_all is not None:
-    # Reverse scale numeric features back to original for consistency
-    numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
-    df_all[numeric_features] = scaler.inverse_transform(df_all[numeric_features])
-    df, _ = preprocess_data(df_all)
-else:
-    df, _ = preprocess_data(df_raw)
+numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 
-# --------------------
-# Streamlit Title
-# --------------------
-st.set_page_config(page_title="AQI Forecast Dashboard", layout="centered")
-st.title("🌫 Air Quality Index Dashboard")
+# Scaling
+df_scaled = df.copy()
+df_scaled[numeric_features] = scaler.transform(df_scaled[numeric_features])
 
 # --------------------
-# Latest AQI
+# Forecasting Next 3 Days
 # --------------------
-latest_aqi = df.iloc[-1]["aqi"]
-st.metric("Latest Recorded AQI", f"{latest_aqi:.2f}")
-
-# --------------------
-# Forecast Next 3 Days
-# --------------------
-future_dates = pd.date_range(start=pd.to_datetime(df.iloc[-1]["timestamp"]) + timedelta(days=1), periods=3)
-
+latest_row = df_scaled.iloc[-1].copy()
 predictions = []
-last_row = df.iloc[-1].copy()
+dates = []
 
-for i in range(3):
-    # Prepare features for prediction
-    features = [
-        last_row["temperature"], last_row["humidity"], last_row["wind_speed"],
-        last_row["pm2_5"], last_row["pm10"], last_row["co"], last_row["no2"],
-        last_row["aqi"], last_row["pm2_5"], last_row["pm10"], last_row["co"], last_row["no2"]
-    ]
-    features = np.array(features).reshape(1, -1)
+for i in range(1, 4):
+    X_input = latest_row[numeric_features + ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]].values.reshape(1, -1)
+    pred_aqi = model.predict(X_input)[0]
+    predictions.append(round(pred_aqi, 2))
+    dates.append((datetime.date.today() + datetime.timedelta(days=i)).strftime("%Y-%m-%d"))
 
-    pred_aqi = model.predict(features)[0]
-    predictions.append(pred_aqi)
-
-    # Shift lags for next iteration
-    last_row["aqi"] = pred_aqi
-    last_row["aqi_lag1"] = pred_aqi
-    last_row["pm2_5_lag1"] = last_row["pm2_5"]
-    last_row["pm10_lag1"] = last_row["pm10"]
-    last_row["co_lag1"] = last_row["co"]
-    last_row["no2_lag1"] = last_row["no2"]
+    # Shift lag values for next prediction
+    latest_row["aqi_lag1"] = pred_aqi
+    latest_row["pm2_5_lag1"] = latest_row["pm2_5"]
+    latest_row["pm10_lag1"] = latest_row["pm10"]
+    latest_row["co_lag1"] = latest_row["co"]
+    latest_row["no2_lag1"] = latest_row["no2"]
 
 # --------------------
-# Show Forecast Table
+# Streamlit Dashboard
 # --------------------
-forecast_df = pd.DataFrame({
-    "Date": future_dates.strftime("%Y-%m-%d"),
-    "Predicted AQI": [round(v, 2) for v in predictions]
-})
+st.title("🌍 Lahore AQI Dashboard")
 
+# Latest AQI
+st.subheader("Latest Recorded AQI")
+st.metric(label="Current AQI", value=round(df.iloc[-1]["aqi"], 2))
+
+# Forecast
 st.subheader("📅 Next 3 Days Forecast")
-st.table(forecast_df)
-
-# --------------------
-# Plot
-# --------------------
-st.line_chart(forecast_df.set_index("Date"))
+forecast_df = pd.DataFrame({"Date": dates, "Predicted AQI": predictions})
+st.dataframe(forecast_df, use_container_width=True)
