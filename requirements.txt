@@ -1,6 +1,9 @@
-hopsworks
+hopsworks==4.2.*
 streamlit
 pandas
 numpy
+requests
 joblib
-pillow
+scikit-learn
+xgboost
+SQLAlchemy<2.0
