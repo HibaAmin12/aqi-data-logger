@@ -11,6 +11,37 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
 # --------------------
+# Preprocessing Function
+# --------------------
+def preprocess_data(df):
+    # Drop NA in AQI
+    df = df.dropna(subset=["aqi"]).sort_values("timestamp")
+
+    # Lag features
+    for col in ["aqi", "pm2_5", "pm10", "co", "no2"]:
+        df[f"{col}_lag1"] = df[col].shift(1)
+
+    df = df.dropna().reset_index(drop=True)
+
+    # Outlier capping
+    def cap_outliers(data, cols):
+        for col in cols:
+            Q1, Q3 = data[col].quantile(0.25), data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+            data[col] = np.clip(data[col], lower, upper)
+        return data
+
+    df = cap_outliers(df, ["pm2_5", "pm10", "wind_speed"])
+
+    # Scaling
+    numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+    scaler = StandardScaler()
+    df[numeric_features] = scaler.fit_transform(df[numeric_features])
+
+    return df, scaler
+
+# --------------------
 # Hopsworks Login
 # --------------------
 api_key = os.getenv("HOPSWORKS_API_KEY")
@@ -27,40 +58,15 @@ fs = project.get_feature_store()
 # Load Data
 # --------------------
 fg = fs.get_feature_group("aqi_features", version=1)
-df = fg.read().sort_values("timestamp")
-df = df.dropna(subset=["aqi"])
+df_raw = fg.read()
 
-# --------------------
-# Lag Features
-# --------------------
-for col in ["aqi", "pm2_5", "pm10", "co", "no2"]:
-    df[f"{col}_lag1"] = df[col].shift(1)
-
-df = df.dropna().reset_index(drop=True)
-
-# --------------------
-# Outlier Capping
-# --------------------
-def cap_outliers(data, cols):
-    for col in cols:
-        Q1, Q3 = data[col].quantile(0.25), data[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
-        data[col] = np.clip(data[col], lower, upper)
-    return data
-
-df = cap_outliers(df, ["pm2_5", "pm10", "wind_speed"])
-
-# --------------------
-# Scaling
-# --------------------
-numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
-scaler = StandardScaler()
-df[numeric_features] = scaler.fit_transform(df[numeric_features])
+# Preprocess data
+df, scaler = preprocess_data(df_raw)
 
 # --------------------
 # Features & Target
 # --------------------
+numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
 features = numeric_features + ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
 X, y = df[features], df["aqi"]
 
@@ -88,16 +94,11 @@ best_model_name, best_model, best_r2 = None, None, -1
 
 for name, model in models.items():
     model.fit(X_train, y_train)
-    y_train_pred, y_test_pred = model.predict(X_train), model.predict(X_test)
-
-    train_mse, test_mse = mean_squared_error(y_train, y_train_pred), mean_squared_error(y_test, y_test_pred)
-    train_rmse, test_rmse = np.sqrt(train_mse), np.sqrt(test_mse)
-    train_mae, test_mae = mean_absolute_error(y_train, y_train_pred), mean_absolute_error(y_test, y_test_pred)
-    train_r2, test_r2 = r2_score(y_train, y_train_pred), r2_score(y_test, y_test_pred)
+    y_test_pred = model.predict(X_test)
+    test_r2 = r2_score(y_test, y_test_pred)
 
     results[name] = {
-        "Train MSE": train_mse, "Train RMSE": train_rmse, "Train MAE": train_mae, "Train R²": train_r2,
-        "Test MSE": test_mse, "Test RMSE": test_rmse, "Test MAE": test_mae, "Test R²": test_r2
+        "Test R²": test_r2
     }
 
     if test_r2 > best_r2:
@@ -106,20 +107,18 @@ for name, model in models.items():
 # --------------------
 # Save Results
 # --------------------
-results_df = pd.DataFrame(results).T
 os.makedirs("model_outputs", exist_ok=True)
-results_df.to_csv("model_outputs/model_results.csv")
+pd.DataFrame(results).T.to_csv("model_outputs/model_results.csv")
 
 # --------------------
 # Save Best Model & Scaler
 # --------------------
-best_model.fit(X, y)  # Refit on full data
-
+best_model.fit(X, y)  # Train on full dataset
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/aqi_best_model.pkl")
-joblib.dump(scaler, "models/scaler.pkl")  # Scaler bhi save karo
+joblib.dump(scaler, "models/scaler.pkl")
 
 # Save latest row for Streamlit
 df.iloc[[-1]].to_csv("latest_pollutants.csv", index=False)
 
-print("Model training complete. Model and scaler saved.")
+print(f"✅ Model training complete. Best model: {best_model_name} (R²={best_r2:.3f})")
