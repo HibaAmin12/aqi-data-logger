@@ -6,3 +6,4 @@ requests
 joblib
 scikit-learn
 xgboost
+matplotlib
