@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 # ---------------------
 # CONFIGURATION
 # ---------------------
-API_KEY = "YOUR_OPENWEATHER_API_KEY"  # apna API key yahan lagao
+API_KEY = os.getenv("API_KEY")  # apna API key yahan lagao
 CITY = "Lahore"  # apni city ka naam
 MODEL_PATH = "aqi_best_model.pkl"  # trained model ka path
 
