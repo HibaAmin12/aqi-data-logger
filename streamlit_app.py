@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 # ---------------------
 API_KEY = os.getenv("API_KEY")  # apna API key yahan lagao
 CITY = "Lahore"  # apni city ka naam
-MODEL_PATH = "aqi_best_model.pkl"  # trained model ka path
+MODEL_PATH = "model/aqi_best_model.pkl"  # trained model ka path
 
 # ---------------------
 # HELPER FUNCTIONS
