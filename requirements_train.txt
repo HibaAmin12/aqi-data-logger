@@ -7,4 +7,4 @@ matplotlib
 seaborn
 joblib
 pyarrow
-# hopsworks[python]==4.2.*   # Commented out or removed
+hopsworks[python]==4.2.7
