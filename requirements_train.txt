@@ -6,6 +6,5 @@ scikit-learn
 numpy
 matplotlib
 seaborn
-python-dotenv
 xgboost
-SQLAlchemy<2.0
+
