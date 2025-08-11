@@ -111,11 +111,15 @@ os.makedirs("model_outputs", exist_ok=True)
 results_df.to_csv("model_outputs/model_results.csv")
 
 # --------------------
-# Save Best Model
+# Save Best Model & Scaler
 # --------------------
-best_model.fit(X, y)
+best_model.fit(X, y)  # Refit on full data
+
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/aqi_best_model.pkl")
+joblib.dump(scaler, "models/scaler.pkl")  # Scaler bhi save karo
 
 # Save latest row for Streamlit
 df.iloc[[-1]].to_csv("latest_pollutants.csv", index=False)
+
+print("Model training complete. Model and scaler saved.")
