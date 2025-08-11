@@ -1,9 +1,13 @@
 hopsworks==4.2.*
 pyarrow
 scikit-learn
-xgboost
-joblib
-matplotlib
+
+streamlit==1.22.0
 pandas
+joblib
 numpy
+matplotlib
 seaborn
+python-dotenv
+xgboost
+SQLAlchemy<2.0
