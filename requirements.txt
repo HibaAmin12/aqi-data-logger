@@ -1,0 +1,6 @@
+hopsworks
+streamlit
+pandas
+numpy
+joblib
+pillow
