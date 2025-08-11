@@ -1,5 +1,3 @@
-# requirements.txt example snippet
-
 streamlit==1.37.1
 pandas>=1.3.0,<2.2.0
 numpy
@@ -9,4 +7,4 @@ matplotlib
 seaborn
 joblib
 pyarrow
-hopsworks==4.2.*
+hopsworks[python]==4.2.*
