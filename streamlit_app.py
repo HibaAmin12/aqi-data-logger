@@ -56,10 +56,10 @@ latest_data = combined_df.tail(1)
 # Load trained model
 # -------------------
 try:
-    model = joblib.load("aqi_model.pkl")
+    model = joblib.load("aqi_best_model.pkl")
     st.success("Model loaded ✅")
 except FileNotFoundError:
-    st.error("❌ aqi_model.pkl not found.")
+    st.error("❌ aqi_best_model.pkl not found.")
     st.stop()
 
 # -------------------
