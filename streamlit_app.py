@@ -1,59 +1,30 @@
-import os
 import streamlit as st
-import hopsworks
 import pandas as pd
 import joblib
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
 # -------------------
-# Page config
+# Streamlit Page Setup
 # -------------------
 st.set_page_config(page_title="AQI Prediction Dashboard", layout="wide")
 st.title("🌍 Pearls AQI Predictor")
-st.markdown("Predicting next 3 days Air Quality Index using latest pollutant data.")
-
-# -------------------
-# Hopsworks Connection
-# -------------------
-PROJECT_NAME = os.getenv("HOPSWORKS_PROJECT")
-API_KEY = os.getenv("HOPSWORKS_API_KEY")
-HOST = os.getenv("HOPSWORKS_HOST")  # add in secrets
-
-st.write("Connecting to Hopsworks...")
-hopsworks_df = None
-try:
-    project = hopsworks.login(api_key_value=API_KEY, project=PROJECT_NAME, host=HOST)
-    fs = project.get_feature_store()
-    feature_group = fs.get_feature_group(name="aqi_features", version=1)
-    hopsworks_df = feature_group.read()
-    st.success("Connected to Hopsworks ✅")
-except Exception as e:
-    st.warning(f"⚠️ Failed to connect to Hopsworks: {e}")
-    st.info("Will try to use local CSV instead.")
+st.markdown("Predicting next 3 days Air Quality Index using latest pollutant data (Offline Mode).")
 
 # -------------------
 # Load latest_pollutants.csv
 # -------------------
-csv_df = None
 try:
     csv_df = pd.read_csv("latest_pollutants.csv")
     st.success("Loaded latest_pollutants.csv ✅")
 except FileNotFoundError:
-    st.error("❌ latest_pollutants.csv not found.")
+    st.error("❌ latest_pollutants.csv not found in directory.")
     st.stop()
 
 # -------------------
-# Combine datasets
-# -------------------
-if hopsworks_df is not None:
-    common_cols = [col for col in csv_df.columns if col in hopsworks_df.columns]
-    combined_df = pd.concat([hopsworks_df[common_cols], csv_df[common_cols]], ignore_index=True)
-else:
-    combined_df = csv_df
-
 # Keep only latest row for prediction
-latest_data = combined_df.tail(1)
+# -------------------
+latest_data = csv_df.tail(1)
 
 # -------------------
 # Load trained model
