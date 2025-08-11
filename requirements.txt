@@ -1,9 +1,9 @@
 streamlit==1.22.0
-pandas==1.5.3
+pandas>=2.2.0
 joblib
 scikit-learn
 numpy
 matplotlib
 seaborn
+python-dotenv
 xgboost
-
