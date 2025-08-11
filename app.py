@@ -15,8 +15,9 @@ st.title("🌍 Pearls AQI Predictor")
 st.markdown("Predicting next 3 days Air Quality Index using latest pollutant data.")
 
 # Hopsworks credentials
-PROJECT_NAME = "HOPSWORKS_PROJECT"
-API_KEY = "HOPSWORKS_API_KEY"  # keep in secrets in real use
+import os
+PROJECT_NAME = os.getenv("HOPSWORKS_PROJECT")
+API_KEY = os.getenv("HOPSWORKS_API_KEY")
 
 st.write("Connecting to Hopsworks...")
 try:
