@@ -1,67 +1,81 @@
 import streamlit as st
 import pandas as pd
-import joblib
+import pickle
+import requests
 from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
 
-# -------------------
-# Streamlit Page Setup
-# -------------------
-st.set_page_config(page_title="AQI Prediction Dashboard", layout="wide")
-st.title("🌍 Pearls AQI Predictor")
-st.markdown("Predicting next 3 days Air Quality Index using latest pollutant data (Offline Mode).")
+# ---------------------
+# CONFIGURATION
+# ---------------------
+API_KEY = "YOUR_OPENWEATHER_API_KEY"  # apna API key yahan lagao
+CITY = "Lahore"  # apni city ka naam
+MODEL_PATH = "aqi_best_model.pkl"  # trained model ka path
 
-# -------------------
-# Load latest_pollutants.csv
-# -------------------
-try:
-    csv_df = pd.read_csv("latest_pollutants.csv")
-    st.success("Loaded latest_pollutants.csv ✅")
-except FileNotFoundError:
-    st.error("❌ latest_pollutants.csv not found in directory.")
-    st.stop()
+# ---------------------
+# HELPER FUNCTIONS
+# ---------------------
+def load_model():
+    with open(MODEL_PATH, "rb") as file:
+        model = pickle.load(file)
+    return model
 
-# -------------------
-# Keep only latest row for prediction
-# -------------------
-latest_data = csv_df.tail(1)
+def get_forecast_data(city, api_key):
+    url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
+    response = requests.get(url)
+    data = response.json()
 
-# -------------------
-# Load trained model
-# -------------------
-try:
-    model = joblib.load("aqi_best_model.pkl")
-    st.success("Model loaded ✅")
-except FileNotFoundError:
-    st.error("❌ aqi_best_model.pkl not found.")
-    st.stop()
+    forecast_list = []
+    for entry in data["list"]:
+        forecast_list.append({
+            "datetime": datetime.fromtimestamp(entry["dt"]),
+            "temp": entry["main"]["temp"],
+            "humidity": entry["main"]["humidity"],
+            "wind_speed": entry["wind"]["speed"],
+            "pressure": entry["main"]["pressure"],
+            # Pollutant placeholder (agar OpenWeather se na mile to default value lagao)
+            "pm2_5": 50,  
+            "pm10": 70
+        })
 
-# -------------------
-# Predict next 3 days AQI
-# -------------------
-predictions = []
-today = datetime.today()
-for i in range(1, 4):
-    future_date = today + timedelta(days=i)
-    predicted_aqi = model.predict(latest_data)[0]
-    predictions.append({
-        "Date": future_date.strftime("%Y-%m-%d"),
-        "Predicted AQI": round(predicted_aqi, 2)
-    })
+    forecast_df = pd.DataFrame(forecast_list)
+    return forecast_df
 
-pred_df = pd.DataFrame(predictions)
+def prepare_features(df):
+    # Features ka selection tumhare training ke hisab se
+    return df[["temp", "humidity", "wind_speed", "pressure", "pm2_5", "pm10"]]
 
-# -------------------
-# Show in Streamlit
-# -------------------
-st.subheader("📊 Next 3 Days AQI Prediction")
-st.dataframe(pred_df, use_container_width=True)
+# ---------------------
+# STREAMLIT UI
+# ---------------------
+st.set_page_config(page_title="AQI Forecast Dashboard", layout="wide")
 
-# Plot
-fig, ax = plt.subplots()
-ax.plot(pred_df["Date"], pred_df["Predicted AQI"], marker="o", linestyle="-")
-ax.set_title("Next 3 Days AQI Forecast")
-ax.set_xlabel("Date")
-ax.set_ylabel("Predicted AQI")
-ax.grid(True)
-st.pyplot(fig)
+st.title("🌫 AQI Prediction Dashboard")
+st.markdown("### Next 3 Days Air Quality Forecast")
+
+# Model load
+model = load_model()
+
+# Data fetch
+st.sidebar.header("Settings")
+city_input = st.sidebar.text_input("Enter City Name", value=CITY)
+
+if st.sidebar.button("Get Forecast"):
+    with st.spinner("Fetching weather data..."):
+        forecast_df = get_forecast_data(city_input, API_KEY)
+
+        # Next 3 days ka filter
+        today = datetime.now()
+        end_date = today + timedelta(days=3)
+        forecast_df = forecast_df[(forecast_df["datetime"] >= today) & (forecast_df["datetime"] <= end_date)]
+
+        # Prediction
+        features = prepare_features(forecast_df)
+        forecast_df["Predicted_AQI"] = model.predict(features)
+
+        # Display table
+        st.dataframe(forecast_df[["datetime", "temp", "humidity", "wind_speed", "pm2_5", "pm10", "Predicted_AQI"]])
+
+        # Chart
+        st.line_chart(forecast_df.set_index("datetime")["Predicted_AQI"])
+
+        st.success("Forecast generated successfully!")
