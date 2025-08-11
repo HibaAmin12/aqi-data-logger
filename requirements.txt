@@ -1,5 +1,4 @@
-hopswork
-
+hopsworks
 streamlit
 pandas
 numpy
