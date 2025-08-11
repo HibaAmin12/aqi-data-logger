@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
 # --------------------
@@ -83,7 +83,7 @@ models = {
     "Ridge Regression": Ridge(alpha=1.0),
     "Lasso Regression": Lasso(alpha=0.01),
     "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
-    "XGBoost": XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)
+    "XGBoost": XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=6, random_state=42)
 }
 
 results = {}
@@ -93,64 +93,90 @@ best_r2 = -1
 
 for name, model in models.items():
     model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    
+    # Predictions
+    y_train_pred = model.predict(X_train)
+    y_test_pred = model.predict(X_test)
 
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    corr = np.corrcoef(y_test, y_pred)[0, 1]
+    # Train metrics
+    train_mse = mean_squared_error(y_train, y_train_pred)
+    train_rmse = np.sqrt(train_mse)
+    train_mae = mean_absolute_error(y_train, y_train_pred)
+    train_r2 = r2_score(y_train, y_train_pred)
 
-    results[name] = {"MSE": mse, "R²": r2, "Correlation": corr}
+    # Test metrics
+    test_mse = mean_squared_error(y_test, y_test_pred)
+    test_rmse = np.sqrt(test_mse)
+    test_mae = mean_absolute_error(y_test, y_test_pred)
+    test_r2 = r2_score(y_test, y_test_pred)
 
-    # Track best model based on R²
-    if r2 > best_r2:
-        best_r2 = r2
+    results[name] = {
+        "Train MSE": train_mse,
+        "Train RMSE": train_rmse,
+        "Train MAE": train_mae,
+        "Train R²": train_r2,
+        "Test MSE": test_mse,
+        "Test RMSE": test_rmse,
+        "Test MAE": test_mae,
+        "Test R²": test_r2
+    }
+
+    # Track best model
+    if test_r2 > best_r2:
+        best_r2 = test_r2
         best_model_name = name
         best_model = model
 
 # --------------------
-# Save Results & Plots
+# Check Overfitting for Best Model
+# --------------------
+train_r2_best = results[best_model_name]["Train R²"]
+test_r2_best = results[best_model_name]["Test R²"]
+
+if train_r2_best - test_r2_best > 0.05:  # significant overfitting
+    print(f"\n Overfitting detected in {best_model_name}. Retraining with tuned parameters...")
+    if best_model_name == "XGBoost":
+        best_model = XGBRegressor(
+            n_estimators=200,
+            learning_rate=0.05,
+            max_depth=4,
+            min_child_weight=3,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42
+        )
+        best_model.fit(X_train, y_train,
+                       eval_set=[(X_test, y_test)],
+                       verbose=False,
+                       early_stopping_rounds=20)
+    elif best_model_name == "Random Forest":
+        best_model = RandomForestRegressor(
+            n_estimators=80,
+            max_depth=10,
+            min_samples_leaf=4,
+            random_state=42
+        )
+        best_model.fit(X_train, y_train)
+
+# --------------------
+# Save Results
 # --------------------
 results_df = pd.DataFrame(results).T
-print("\n📊 Model Performance:\n")
+print("\n📊 Model Performance (Train & Test):\n")
 print(results_df)
 
 os.makedirs("model_outputs", exist_ok=True)
 results_df.to_csv("model_outputs/model_results.csv")
 
-# R² Plot
-plt.figure(figsize=(8, 5))
-plt.bar(results_df.index, results_df["R²"], color='skyblue')
-plt.title("R² Score Comparison of Models")
-plt.ylabel("R² Score")
-plt.xticks(rotation=30)
-plt.ylim(0, 1.05)
-plt.tight_layout()
-plt.savefig("model_outputs/r2_comparison.png")
-plt.close()
-
-# MSE Plot
-plt.figure(figsize=(8, 5))
-plt.bar(results_df.index, results_df["MSE"], color='salmon')
-plt.title("MSE Comparison of Models")
-plt.ylabel("Mean Squared Error")
-plt.xticks(rotation=30)
-plt.tight_layout()
-plt.savefig("model_outputs/mse_comparison.png")
-plt.close()
-
 # --------------------
-# Save Best Model Automatically
+# Save Best Model
 # --------------------
-print(f"\n Best model selected: {best_model_name} (R²: {best_r2:.4f})")
 best_model.fit(X, y)
-
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/aqi_best_model.pkl")
-print(" Best model saved to 'models/aqi_best_model.pkl'")
+print(f"\n✅ Best model saved: {best_model_name} (R²: {best_r2:.4f})")
 
-# --------------------
-# Save Latest Row for Streamlit
-# --------------------
+# Save latest row for Streamlit
 latest = df.iloc[-1]
 latest.to_frame().T.to_csv("latest_pollutants.csv", index=False)
-print(" Latest pollutants and AQI saved to 'latest_pollutants.csv'")
+print(" Latest pollutants saved to 'latest_pollutants.csv'")
