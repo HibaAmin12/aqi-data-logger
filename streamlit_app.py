@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import joblib
 import datetime
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # -----------------
 # Load Data & Models
@@ -9,6 +11,7 @@ import datetime
 @st.cache_data
 def load_data():
     df = pd.read_csv("processed_data.csv")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])  # Convert timestamp once here
     latest = pd.read_csv("latest_pollutants.csv")
     model = joblib.load("models/aqi_best_model.pkl")
     scaler = joblib.load("models/scaler.pkl")
@@ -26,7 +29,6 @@ def forecast_aqi(df, model, days=3):
     for i in range(days):
         latest_data = temp_df.iloc[-1].copy()
 
-        # Features for prediction
         features = [
             "temperature", "humidity", "wind_speed",
             "pm2_5", "pm10", "co", "no2",
@@ -37,11 +39,10 @@ def forecast_aqi(df, model, days=3):
         predicted_aqi = model.predict(X_latest)[0]
         predicted_aqi = round(float(predicted_aqi), 2)
 
-        next_date = pd.to_datetime(latest_data["timestamp"]) + datetime.timedelta(days=1)
+        next_date = latest_data["timestamp"] + datetime.timedelta(days=1)
 
-        # Create next row
         new_row = latest_data.copy()
-        new_row["timestamp"] = next_date.strftime("%Y-%m-%d")
+        new_row["timestamp"] = next_date
         new_row["aqi"] = predicted_aqi
         new_row["aqi_lag1"] = latest_data["aqi"]
         new_row["pm2_5_lag1"] = latest_data["pm2_5"]
@@ -49,8 +50,7 @@ def forecast_aqi(df, model, days=3):
         new_row["co_lag1"] = latest_data["co"]
         new_row["no2_lag1"] = latest_data["no2"]
 
-        # Append forecast
-        forecast_results.append({"Date": new_row["timestamp"], "Predicted AQI": predicted_aqi})
+        forecast_results.append({"Date": new_row["timestamp"].strftime("%Y-%m-%d"), "Predicted AQI": predicted_aqi})
 
         temp_df = pd.concat([temp_df, pd.DataFrame([new_row])], ignore_index=True)
 
@@ -65,20 +65,17 @@ st.set_page_config(page_title="🌍 Lahore AQI Dashboard", layout="centered")
 
 st.title("🌍 Lahore AQI Dashboard")
 st.subheader("📌 Latest Recorded AQI")
-st.metric("Current AQI", value=round(float(latest_row['aqi'].values[0]), 2))
+st.metric("Current AQI", value=round(float(latest_row.iloc[0]['aqi']), 2))
 
 st.subheader("📅 Next 3 Days Forecast")
 st.table(forecast_df)
 
-# Optionally plot historical + forecast
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 st.subheader("📈 Historical AQI & Forecast Trend")
 plt.figure(figsize=(8, 4))
-sns.lineplot(x=pd.to_datetime(df["timestamp"]), y=df["aqi"], label="Historical AQI")
+sns.lineplot(x=df["timestamp"], y=df["aqi"], label="Historical AQI")
 sns.lineplot(x=pd.to_datetime(forecast_df["Date"]), y=forecast_df["Predicted AQI"], label="Forecast AQI")
 plt.xticks(rotation=45)
 plt.ylabel("AQI")
 plt.legend()
+plt.tight_layout()
 st.pyplot(plt)
