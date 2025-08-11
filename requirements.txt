@@ -6,5 +6,5 @@ xgboost
 matplotlib
 seaborn
 joblib
-hopsworks[python]==4.2.*
 pyarrow
+hopsworks[python]==4.2.*
