@@ -1,10 +1,8 @@
-
 pyarrow
-scikit-learn
-
 streamlit==1.22.0
-pandas
+pandas==1.5.3
 joblib
+scikit-learn
 numpy
 matplotlib
 seaborn
