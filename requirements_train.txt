@@ -1,5 +1,7 @@
+# requirements.txt example snippet
+
 streamlit==1.37.1
-pandas
+pandas>=1.3.0,<2.2.0
 numpy
 scikit-learn
 xgboost
@@ -7,4 +9,4 @@ matplotlib
 seaborn
 joblib
 pyarrow
-hopsworks[python]==4.2.*
+hopsworks==4.2.*
