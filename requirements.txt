@@ -1,8 +1,8 @@
-streamlit
-hopsworks>=4.2
+streamlit==1.22.0
+pandas==1.5.3
+hopsworks==3.7.0
 joblib
 scikit-learn
-pandas
 numpy
 matplotlib
 seaborn
