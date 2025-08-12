@@ -22,62 +22,40 @@ def forecast_aqi(df, model, scaler, days=3):
         "pm2_5", "pm10", "co", "no2",
         "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
     ]
-
-    temp_df = df.copy()
+    
     forecast_results = []
+    temp_df = df.copy()
 
     for _ in range(days):
-        latest = temp_df.iloc[-1].copy()
-        
-        # Prepare input features for prediction
-        X = latest[features].values.reshape(1, -1)
-        
-        # Scale only numeric features (first 7)
-        X_numeric = X[:, :7]
-        X_scaled_numeric = scaler.transform(X_numeric)
-        
-        # Combine scaled numeric with lag features as is
-        X_scaled = np.hstack([X_scaled_numeric, X[:, 7:]])
-        
-        # Predict AQI
+        latest_data = temp_df.iloc[-1].copy()
+        X = latest_data[features].values.reshape(1, -1)
+        X_scaled = scaler.transform(X)
         pred = model.predict(X_scaled)[0]
-        pred = round(float(pred), 2)
-
-        next_date = latest["timestamp"] + datetime.timedelta(days=1)
-
-        # Prepare new row for next prediction
-        new_row = latest.copy()
+        pred = float(round(pred, 2))
+        
+        next_date = latest_data["timestamp"] + datetime.timedelta(days=1)
+        new_row = latest_data.copy()
         new_row["timestamp"] = next_date
         new_row["aqi"] = pred
         
-        # Update lag features
-        new_row["aqi_lag1"] = latest["aqi"]
-        new_row["pm2_5_lag1"] = latest["pm2_5"]
-        new_row["pm10_lag1"] = latest["pm10"]
-        new_row["co_lag1"] = latest["co"]
-        new_row["no2_lag1"] = latest["no2"]
+        # Update lag features for next prediction
+        new_row["aqi_lag1"] = latest_data["aqi"]
+        new_row["pm2_5_lag1"] = latest_data["pm2_5"]
+        new_row["pm10_lag1"] = latest_data["pm10"]
+        new_row["co_lag1"] = latest_data["co"]
+        new_row["no2_lag1"] = latest_data["no2"]
 
-        # Keep numeric features same as previous day (or replace with logic if available)
-        for col in ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]:
-            new_row[col] = latest[col]
-
-        forecast_results.append({
-            "Date": next_date.strftime("%Y-%m-%d"),
-            "Predicted AQI": pred
-        })
-
+        forecast_results.append({"Date": next_date.strftime("%Y-%m-%d"), "Predicted AQI": pred})
         temp_df = pd.concat([temp_df, pd.DataFrame([new_row])], ignore_index=True)
-
+    
     return pd.DataFrame(forecast_results)
 
 st.title("🌍 Lahore AQI Dashboard")
 
-# Show today's AQI (last available)
-latest_aqi = df.iloc[-1]["aqi"]
 st.subheader("📌 Today's AQI")
-st.metric(label="Current AQI", value=round(float(latest_aqi), 2))
+latest_aqi = df.iloc[-1]["aqi"]
+st.metric("Current AQI", round(float(latest_aqi), 2))
 
-# Forecast next 3 days AQI
-forecast_df = forecast_aqi(df, model, scaler, days=3)
 st.subheader("📅 Next 3 Days AQI Forecast")
+forecast_df = forecast_aqi(df, model, scaler, days=3)
 st.table(forecast_df)
