@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import r2_score
 from sklearn.preprocessing import StandardScaler
 
 # Hopsworks Login
@@ -43,19 +43,25 @@ def cap_outliers(data, cols):
 
 df = cap_outliers(df, ["pm2_5", "pm10", "wind_speed"])
 
-# Scaling
-numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+# ✅ Features & Target (12 features total)
+features = [
+    "temperature", "humidity", "wind_speed",
+    "pm2_5", "pm10", "co", "no2",
+    "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
+]
+target = "aqi"
+
+# ✅ Scaling ALL features (including lag features)
 scaler = StandardScaler()
-df[numeric_features] = scaler.fit_transform(df[numeric_features])
+df[features] = scaler.fit_transform(df[features])
 
-# Features & Target
-features = numeric_features + ["aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
-X, y = df[features], df["aqi"]
+# Prepare X, y
+X, y = df[features], df[target]
 
-# Split
+# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train Models
+# Models
 models = {
     "Linear Regression": LinearRegression(),
     "Ridge Regression": Ridge(alpha=1.0),
@@ -64,42 +70,38 @@ models = {
     "XGBoost": XGBRegressor(
         n_estimators=300, learning_rate=0.05, max_depth=6,
         objective="reg:squarederror", random_state=42,
-        use_label_encoder=False, eval_metric='rmse'
+        eval_metric='rmse'
     )
 }
 
 results = {}
 best_model_name, best_model, best_r2 = None, None, -1
 
+# Train & Evaluate
 for name, model in models.items():
     model.fit(X_train, y_train)
     y_train_pred, y_test_pred = model.predict(X_train), model.predict(X_test)
-
     train_r2 = r2_score(y_train, y_train_pred)
     test_r2 = r2_score(y_test, y_test_pred)
-
-    results[name] = {
-        "Train R²": train_r2,
-        "Test R²": test_r2,
-    }
-
+    results[name] = {"Train R²": train_r2, "Test R²": test_r2}
     if test_r2 > best_r2:
         best_r2, best_model_name, best_model = test_r2, name, model
 
-# Save Results
-results_df = pd.DataFrame(results).T
+# Save results
 os.makedirs("model_outputs", exist_ok=True)
-results_df.to_csv("model_outputs/model_results.csv")
+pd.DataFrame(results).T.to_csv("model_outputs/model_results.csv")
 
-# Refit best model on full data and save
+# ✅ Refit best model on ALL data
 best_model.fit(X, y)
+
+# Save model & scaler
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, "models/aqi_best_model.pkl")
 joblib.dump(scaler, "models/scaler.pkl")
 
-# Save latest row and full dataset
+# Save datasets
 df.iloc[[-1]].to_csv("latest_pollutants.csv", index=False)
 df.to_csv("processed_data.csv", index=False)
 
-print(f"Model training complete using {best_model_name}. Model and scaler saved.")
-print("Latest and full processed dataset saved.")
+print(f"✅ Model training complete using {best_model_name}.")
+print("✅ Model and scaler saved. Latest and full processed dataset saved.")
