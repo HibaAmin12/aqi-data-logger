@@ -4,7 +4,6 @@ import joblib
 import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
-import xgboost as xgb
 import numpy as np
 
 st.set_page_config(page_title="Lahore AQI Dashboard", layout="wide")
@@ -14,27 +13,43 @@ def load_data_and_model():
     df = pd.read_csv("processed_data.csv")
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     model = joblib.load("models/aqi_best_model.pkl")
-    scaler = joblib.load("models/scaler.pkl")  # Agar scaler use karte ho
+    scaler = joblib.load("models/scaler.pkl")  # Scaler for base features
     return df, model, scaler
 
 df, model, scaler = load_data_and_model()
 
 def forecast_aqi(df, model, scaler=None, days=3):
+    # All features needed by the model
     features = [
         "temperature", "humidity", "wind_speed",
         "pm2_5", "pm10", "co", "no2",
         "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
     ]
+
+    # Only features scaler was trained on
+    base_features = [
+        "temperature", "humidity", "wind_speed",
+        "pm2_5", "pm10", "co", "no2"
+    ]
     
     forecast_results = []
     temp_df = df.copy()
     
-    for i in range(days):
+    for _ in range(days):
         latest_data = temp_df.iloc[-1].copy()
-        X_latest = latest_data[features].values.reshape(1, -1)
         
-        if scaler:
-            X_latest = scaler.transform(X_latest)
+        # Scale only base features
+        base_feat_vals = latest_data[base_features].values.reshape(1, -1)
+        if scaler is not None:
+            base_feat_vals = scaler.transform(base_feat_vals)
+        
+        # Lag features stay unscaled
+        lag_feat_vals = latest_data[[
+            "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
+        ]].values.reshape(1, -1)
+        
+        # Combine scaled base features and unscaled lag features
+        X_latest = np.hstack([base_feat_vals, lag_feat_vals])
         
         predicted_aqi = model.predict(X_latest)[0]
         predicted_aqi = round(float(predicted_aqi), 2)
@@ -61,10 +76,11 @@ def forecast_aqi(df, model, scaler=None, days=3):
     
     return pd.DataFrame(forecast_results)
 
-# Show title
+# --- Streamlit UI ---
+
 st.title("🌍 Lahore AQI Dashboard")
 
-# Show today's AQI (last available from df)
+# Show today's AQI (last available from dataset)
 latest_aqi = df.iloc[-1]["aqi"]
 st.subheader("📌 Today's AQI")
 st.metric(label="Current AQI", value=round(float(latest_aqi), 2))
