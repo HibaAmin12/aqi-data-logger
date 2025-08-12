@@ -1,84 +1,78 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
 import datetime
-import numpy as np
 
-# Page config
-st.set_page_config(page_title="Lahore AQI Dashboard", layout="wide")
+# --------------------------
+# Load Model & Scaler
+# --------------------------
+model = joblib.load("models/aqi_best_model.pkl")
+scaler = joblib.load("models/scaler.pkl")
 
-# Load data and model
-@st.cache_data
-def load_data_and_model():
-    df = pd.read_csv("processed_data.csv")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    model = joblib.load("models/aqi_best_model.pkl")
-    scaler = joblib.load("models/scaler.pkl")
-    return df, model, scaler
+# --------------------------
+# Load Processed Data
+# --------------------------
+df = pd.read_csv("processed_data.csv")
+df = df.sort_values("timestamp").reset_index(drop=True)
 
-df, model, scaler = load_data_and_model()
+# Features used during training
+features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2",
+            "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
 
-# Forecast function
+# --------------------------
+# Forecast Function
+# --------------------------
 def forecast_aqi(df, model, scaler, days=3):
-    features = [
-        "temperature", "humidity", "wind_speed",
-        "pm2_5", "pm10", "co", "no2",
-        "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
-    ]
-    
-    # Check for missing features
-    missing = [f for f in features if f not in df.columns]
-    if missing:
-        st.error(f"❌ Missing columns in dataset: {missing}")
-        st.stop()
+    df = df.copy()
+    forecasts = []
+    last_row = df.iloc[-1].copy()
 
-    forecast_results = []
-    temp_df = df.copy()
+    for i in range(days):
+        X = pd.DataFrame([last_row[features].values], columns=features)
 
-    for _ in range(days):
-        latest_data = temp_df.iloc[-1].copy()
-        X = latest_data[features].astype(float).values.reshape(1, -1)
+        # Scale numeric features only
+        numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
+        X_scaled = X.copy()
+        X_scaled[numeric_features] = scaler.transform(X[numeric_features])
 
-        # Validate feature count matches scaler training
-        if X.shape[1] != scaler.n_features_in_:
-            st.error(f"❌ Feature count mismatch! Scaler expects {scaler.n_features_in_} features, got {X.shape[1]}.")
-            st.error(f"Features used: {features}")
-            st.stop()
+        pred_aqi = model.predict(X_scaled)[0]
+        forecasts.append(pred_aqi)
 
-        X_scaled = scaler.transform(X)
-        pred = float(round(model.predict(X_scaled)[0], 2))
+        # Shift lag features for next prediction
+        last_row["aqi_lag1"] = pred_aqi
+        last_row["pm2_5_lag1"] = last_row["pm2_5"]
+        last_row["pm10_lag1"] = last_row["pm10"]
+        last_row["co_lag1"] = last_row["co"]
+        last_row["no2_lag1"] = last_row["no2"]
 
-        next_date = latest_data["timestamp"] + datetime.timedelta(days=1)
-        new_row = latest_data.copy()
-        new_row["timestamp"] = next_date
-        new_row["aqi"] = pred
+        # Simulate small random changes in pollutants for next day
+        for col in ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]:
+            last_row[col] = last_row[col] * np.random.uniform(0.98, 1.02)
 
-        # Update lag features for next prediction
-        new_row["aqi_lag1"] = latest_data["aqi"]
-        new_row["pm2_5_lag1"] = latest_data["pm2_5"]
-        new_row["pm10_lag1"] = latest_data["pm10"]
-        new_row["co_lag1"] = latest_data["co"]
-        new_row["no2_lag1"] = latest_data["no2"]
+    return forecasts
 
-        forecast_results.append({
-            "Date": next_date.strftime("%Y-%m-%d"),
-            "Predicted AQI": pred
-        })
+# --------------------------
+# Streamlit UI
+# --------------------------
+st.set_page_config(page_title="Lahore AQI Dashboard", layout="centered")
 
-        temp_df = pd.concat([temp_df, pd.DataFrame([new_row])], ignore_index=True)
-
-    return pd.DataFrame(forecast_results)
-
-# UI
 st.title("🌍 Lahore AQI Dashboard")
 
-st.subheader("📌 Today's AQI")
+# Today's AQI
 latest_aqi = df.iloc[-1]["aqi"]
-st.metric("Current AQI", round(float(latest_aqi), 2))
+st.subheader("📌 Today's AQI")
+st.metric("Current AQI", round(latest_aqi, 2))
 
-st.subheader("📅 Next 3 Days AQI Forecast")
-forecast_df = forecast_aqi(df, model, scaler, days=3)
-st.table(forecast_df)
+# Forecast for next 3 days
+try:
+    forecast_values = forecast_aqi(df, model, scaler, days=3)
+    forecast_dates = [(datetime.date.today() + datetime.timedelta(days=i+1)).strftime("%Y-%m-%d") for i in range(3)]
+    forecast_df = pd.DataFrame({"Date": forecast_dates, "Predicted AQI": np.round(forecast_values, 2)})
 
-st.markdown("---")
-st.caption("Made with ❤️ using Streamlit")
+    st.subheader("📅 Next 3 Days AQI Forecast")
+    st.table(forecast_df)
+except Exception as e:
+    st.error(f"Error in forecasting: {e}")
+
+st.markdown("Made with ❤️ using Streamlit")
