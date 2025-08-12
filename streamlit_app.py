@@ -1,75 +1,88 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import datetime
+import matplotlib.pyplot as plt
+import seaborn as sns
+import xgboost as xgb
 import numpy as np
-from datetime import timedelta
 
-# --- Load model, scaler, and latest data ---
+st.set_page_config(page_title="Lahore AQI Dashboard", layout="wide")
+
 @st.cache_data
-def load_assets():
+def load_data_and_model():
+    df = pd.read_csv("processed_data.csv")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
     model = joblib.load("models/aqi_best_model.pkl")
-    scaler = joblib.load("models/scaler.pkl")
-    latest = pd.read_csv("latest_pollutants.csv")
-    return model, scaler, latest
+    scaler = joblib.load("models/scaler.pkl")  # Agar scaler use karte ho
+    return df, model, scaler
 
-model, scaler, latest = load_assets()
+df, model, scaler = load_data_and_model()
 
-st.title("🌍 Lahore AQI Dashboard")
-st.subheader("📌 Today's AQI Prediction")
-
-# --- Prepare features for prediction ---
-features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2",
-            "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"]
-
-# Scale numeric features
-numeric_features = ["temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2"]
-
-# Extract latest feature row
-X_raw = latest[features].copy()
-
-# Scale numeric columns only
-X_raw[numeric_features] = scaler.transform(X_raw[numeric_features])
-
-# Convert to numpy array for prediction
-X = X_raw.values
-
-# Predict AQI
-try:
-    predicted_aqi = model.predict(X)[0]
-    predicted_aqi = round(float(predicted_aqi), 2)
-except Exception as e:
-    st.error(f"Prediction failed: {e}")
-    predicted_aqi = None
-
-if predicted_aqi is not None:
-    st.metric("Current AQI (Predicted)", value=predicted_aqi)
-
-    # --- Next 3 days forecast (simple lag-based) ---
-    st.subheader("📅 Next 3 Days AQI Forecast")
+def forecast_aqi(df, model, scaler=None, days=3):
+    features = [
+        "temperature", "humidity", "wind_speed",
+        "pm2_5", "pm10", "co", "no2",
+        "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
+    ]
+    
     forecast_results = []
-    temp_row = latest.iloc[0].copy()
+    temp_df = df.copy()
+    
+    for i in range(days):
+        latest_data = temp_df.iloc[-1].copy()
+        X_latest = latest_data[features].values.reshape(1, -1)
+        
+        if scaler:
+            X_latest = scaler.transform(X_latest)
+        
+        predicted_aqi = model.predict(X_latest)[0]
+        predicted_aqi = round(float(predicted_aqi), 2)
+        
+        next_date = latest_data["timestamp"] + datetime.timedelta(days=1)
+        
+        new_row = latest_data.copy()
+        new_row["timestamp"] = next_date
+        new_row["aqi"] = predicted_aqi
+        
+        # Update lag features for next iteration
+        new_row["aqi_lag1"] = latest_data["aqi"]
+        new_row["pm2_5_lag1"] = latest_data["pm2_5"]
+        new_row["pm10_lag1"] = latest_data["pm10"]
+        new_row["co_lag1"] = latest_data["co"]
+        new_row["no2_lag1"] = latest_data["no2"]
+        
+        forecast_results.append({
+            "Date": next_date.strftime("%Y-%m-%d"),
+            "Predicted AQI": predicted_aqi
+        })
+        
+        temp_df = pd.concat([temp_df, pd.DataFrame([new_row])], ignore_index=True)
+    
+    return pd.DataFrame(forecast_results)
 
-    for i in range(1, 4):
-        # Update lags with previous prediction
-        temp_row["aqi_lag1"] = predicted_aqi if i == 1 else forecast_results[-1]["Predicted AQI"]
-        temp_row["pm2_5_lag1"] = temp_row["pm2_5"]
-        temp_row["pm10_lag1"] = temp_row["pm10"]
-        temp_row["co_lag1"] = temp_row["co"]
-        temp_row["no2_lag1"] = temp_row["no2"]
+# Show title
+st.title("🌍 Lahore AQI Dashboard")
 
-        # Prepare features and scale
-        features_row = temp_row[features].copy()
-        features_row[numeric_features] = scaler.transform([features_row[numeric_features]])[0]
+# Show today's AQI (last available from df)
+latest_aqi = df.iloc[-1]["aqi"]
+st.subheader("📌 Today's AQI")
+st.metric(label="Current AQI", value=round(float(latest_aqi), 2))
 
-        # Predict next day AQI
-        next_aqi = model.predict([features_row.values])[0]
-        next_aqi = round(float(next_aqi), 2)
+# Forecast next 3 days AQI
+forecast_df = forecast_aqi(df, model, scaler, days=3)
+st.subheader("📅 Next 3 Days AQI Forecast")
+st.table(forecast_df)
 
-        forecast_date = pd.to_datetime(temp_row["timestamp"]) + timedelta(days=i)
-        forecast_results.append({"Date": forecast_date.strftime("%Y-%m-%d"), "Predicted AQI": next_aqi})
+# Plot Historical and Forecast AQI
+st.subheader("📈 Historical AQI & Forecast Trend")
 
-    forecast_df = pd.DataFrame(forecast_results)
-    st.table(forecast_df)
-else:
-    st.warning("Could not generate AQI prediction.")
-
+plt.figure(figsize=(10, 5))
+sns.lineplot(x=df["timestamp"], y=df["aqi"], label="Historical AQI")
+sns.lineplot(x=pd.to_datetime(forecast_df["Date"]), y=forecast_df["Predicted AQI"], label="Forecast AQI")
+plt.xticks(rotation=45)
+plt.ylabel("AQI")
+plt.xlabel("Date")
+plt.legend()
+plt.tight_layout()
+st.pyplot(plt)
