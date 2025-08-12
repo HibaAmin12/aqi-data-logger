@@ -26,6 +26,7 @@ jobs:
     - name: 📦 Install dependencies
       run: |
         pip install hopsworks==4.2.4
+        pip install "hopsworks[python]"
         pip install -r requirements.txt
         pip install confluent-kafka
         pip install pandas requests pyarrow seaborn matplotlib
