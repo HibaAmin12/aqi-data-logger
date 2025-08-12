@@ -78,9 +78,14 @@ models = {
     "Lasso Regression": Lasso(alpha=0.01),
     "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
     "XGBoost": XGBRegressor(
-        n_estimators=300, learning_rate=0.05, max_depth=6,
-        objective="reg:squarederror", random_state=42
-    )
+    n_estimators=300,
+    learning_rate=0.05,
+    max_depth=6,
+    objective="reg:squarederror",
+    random_state=42,
+    tree_method="hist"  # Use CPU-based histogram tree method
+)
+
 }
 
 results = {}
