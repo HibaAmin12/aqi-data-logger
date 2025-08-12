@@ -28,28 +28,39 @@ def forecast_aqi(df, model, scaler, days=3):
 
     for _ in range(days):
         latest_data = temp_df.iloc[-1].copy()
-        X = latest_data[features].values.reshape(1, -1)
+
+        # Make sure all feature values are floats (and exist)
+        X = latest_data[features].astype(float).values.reshape(1, -1)
+
+        # Scale features before prediction
         X_scaled = scaler.transform(X)
+
+        # Predict AQI
         pred = model.predict(X_scaled)[0]
         pred = float(round(pred, 2))
         
+        # Prepare next day's row
         next_date = latest_data["timestamp"] + datetime.timedelta(days=1)
         new_row = latest_data.copy()
         new_row["timestamp"] = next_date
         new_row["aqi"] = pred
         
-        # Update lag features for next prediction
+        # Update lag features for next iteration
         new_row["aqi_lag1"] = latest_data["aqi"]
         new_row["pm2_5_lag1"] = latest_data["pm2_5"]
         new_row["pm10_lag1"] = latest_data["pm10"]
         new_row["co_lag1"] = latest_data["co"]
         new_row["no2_lag1"] = latest_data["no2"]
 
+        # Append forecast result
         forecast_results.append({"Date": next_date.strftime("%Y-%m-%d"), "Predicted AQI": pred})
+
+        # Add new row to temp_df for next iteration
         temp_df = pd.concat([temp_df, pd.DataFrame([new_row])], ignore_index=True)
     
     return pd.DataFrame(forecast_results)
 
+# Streamlit UI
 st.title("🌍 Lahore AQI Dashboard")
 
 st.subheader("📌 Today's AQI")
