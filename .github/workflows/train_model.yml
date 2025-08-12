@@ -21,7 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install "hopsworks[python]" pyarrow scikit-learn xgboost joblib matplotlib pandas numpy seaborn
+        pip install "hopsworks[python]" pyarrow scikit-learn xgboost==1.7.3 joblib matplotlib pandas numpy seaborn
 
     - name: Train and Evaluate Models
       env:
