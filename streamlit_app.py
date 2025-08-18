@@ -165,4 +165,4 @@ except Exception as e:
     st.error(f"Error in forecasting: {e}")
     # For debug (optional) show exception text in expander (safe since model/data may contain secrets — don't print those)
     with st.expander("Show error details"):
-        st.exception(e)
+        st.exception(e) isi code mai prediction horhi
