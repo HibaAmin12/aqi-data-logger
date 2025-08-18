@@ -26,7 +26,7 @@ st.dataframe(df.tail())
 
 # Ensure correct feature columns
 # Replace this list with the SAME order as you used during training
-FEATURES = ["pm2_5", "pm10", "no2", "so2", "co", "o3", "temp", "humidity", "pressure"]
+FEATURES = ["pm2_5", "pm10", "no2", "co", "temp", "humidity", "pressure"]
 
 missing_features = [f for f in FEATURES if f not in df.columns]
 if missing_features:
