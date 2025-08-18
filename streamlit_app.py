@@ -1,4 +1,4 @@
-# streamlit_app.py
+
 import streamlit as st
 import pandas as pd
 import joblib
@@ -165,4 +165,4 @@ except Exception as e:
     st.error(f"Error in forecasting: {e}")
     # For debug (optional) show exception text in expander (safe since model/data may contain secrets — don't print those)
     with st.expander("Show error details"):
-        st.exception(e) isi code mai prediction horhi
+        st.exception(e) 
