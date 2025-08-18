@@ -13,7 +13,7 @@ st.title("🌍 Air Quality Index (AQI) Prediction")
 @st.cache_data
 def load_data():
     df = pd.read_csv("processed_data.csv")
-    df["date"] = pd.to_datetime(df["date"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"])  # correct column
     return df
 
 data = load_data()
@@ -24,13 +24,13 @@ st.write(data.tail(5))
 
 # Today's AQI (last row of dataset)
 latest_row = data.iloc[-1]
-today_aqi = latest_row["AQI"]
+today_aqi = latest_row["aqi"]   # lowercase column name
 
 st.subheader("🌟 Today's AQI")
 st.metric("Current AQI", f"{today_aqi:.2f}")
 
 # Prepare features for prediction
-feature_cols = [col for col in data.columns if col not in ["date", "AQI"]]
+feature_cols = [col for col in data.columns if col not in ["id", "timestamp", "aqi"]]
 
 X_latest = data[feature_cols].iloc[-1:].values  # last row for today
 
@@ -52,8 +52,8 @@ for i in range(forecast_days):
 
     # Feedback loop: use predicted AQI as feature for next day
     X_latest = X_latest.copy()
-    if "AQI" in feature_cols:
-        X_latest[0][feature_cols.index("AQI")] = pred_aqi
+    if "aqi" in feature_cols:
+        X_latest[0][feature_cols.index("aqi")] = pred_aqi
 
 # Show forecast
 forecast_df = pd.DataFrame({
