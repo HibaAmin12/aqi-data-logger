@@ -5,7 +5,7 @@ import joblib
 import datetime
 
 # Load trained model
-model = joblib.load("models/aqi_model.pkl")
+model = joblib.load("models/aqi_best_model.pkl")
 
 st.title("🌍 Air Quality Index (AQI) Prediction")
 
