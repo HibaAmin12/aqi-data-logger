@@ -1,43 +1,57 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import os
+import datetime as dt
 
-# Load model
-model_path = "models/aqi_best_model.pkl"
-if not os.path.exists(model_path):
-    st.error("❌ Trained model file not found. Please upload models/aqi_model.pkl")
+# Load trained model
+model = joblib.load("models/aqi_best_model.pkl")
+
+# Title
+st.title("🌍 Real-Time Air Quality Index (AQI) Prediction")
+
+# Load processed data
+try:
+    df = pd.read_csv("processed_data.csv")
+except FileNotFoundError:
+    st.error("❌ processed_data.csv file not found! Upload it first.")
     st.stop()
 
-model = joblib.load(model_path)
-
-# Load processed.csv
-data_path = "processed_data.csv"
-if not os.path.exists(data_path):
-    st.error("❌ processed.csv file not found. Please upload data/processed.csv")
-    st.stop()
-
-df = pd.read_csv(data_path)
-
-st.title("🌍 Air Quality Index (AQI) Prediction")
-
-st.write("### Last 5 records from processed data:")
+# Show last few rows of data
+st.subheader("📊 Latest Available Data")
 st.dataframe(df.tail())
 
-# Ensure correct feature columns
-# Replace this list with the SAME order as you used during training
-FEATURES = ["pm2_5", "pm10", "no2", "co", "temperature", "humidity"]
+# Select only the features available in processed_data.csv
+feature_columns = [
+    "temperature", "humidity", "wind_speed", "pm2_5", "pm10", "co", "no2",
+    "aqi_lag1", "pm2_5_lag1", "pm10_lag1", "co_lag1", "no2_lag1"
+]
 
-missing_features = [f for f in FEATURES if f not in df.columns]
-if missing_features:
-    st.error(f"❌ Missing features in processed.csv: {missing_features}")
+missing = [col for col in feature_columns if col not in df.columns]
+if missing:
+    st.error(f"❌ Missing required columns in processed_data.csv: {missing}")
     st.stop()
 
-X_latest = df[FEATURES].iloc[[-1]]  # last row with only required features
+# Get the latest row
+latest_data = df.iloc[-1][feature_columns].values.reshape(1, -1)
 
 # Predict AQI
-try:
-    pred_aqi = model.predict(X_latest)[0]
-    st.success(f"✅ Predicted AQI: {pred_aqi:.2f}")
-except Exception as e:
-    st.error(f"⚠️ Prediction failed: {str(e)}")
+pred_aqi = model.predict(latest_data)[0]
+
+# Show result
+st.subheader("📈 Predicted AQI for Next Hour")
+st.success(f"Predicted AQI: {pred_aqi:.2f}")
+
+# Show forecast for next 3 hours (using last row repeatedly)
+st.subheader("🔮 AQI Forecast for Next 3 Hours")
+forecast = []
+current_time = pd.to_datetime(df.iloc[-1]["timestamp"])
+for i in range(1, 4):
+    next_time = current_time + dt.timedelta(hours=i)
+    pred = model.predict(latest_data)[0]
+    forecast.append((next_time.strftime("%Y-%m-%d %H:%M"), pred))
+
+forecast_df = pd.DataFrame(forecast, columns=["Time", "Predicted AQI"])
+st.table(forecast_df)
+
+# Plot forecast
+st.line_chart(forecast_df.set_index("Time"))
