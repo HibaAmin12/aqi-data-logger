@@ -12,7 +12,7 @@ st.title("🌍 Air Quality Index (AQI) Prediction")
 # Load dataset
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/processed_data.csv")
+    df = pd.read_csv("processed_data.csv")
     df["date"] = pd.to_datetime(df["date"])
     return df
 
